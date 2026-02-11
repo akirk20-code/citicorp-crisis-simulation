@@ -1,0 +1,35 @@
+# MATLAB generated files
+*.asv
+*.m~
+*.mex*
+*.mlappinstall
+*.mlpkginstall
+
+# MATLAB output/temp
+slprj/
+codegen/
+*.slxc
+
+# Generated figures (reproducible from code)
+figures/*.png
+figures/*.fig
+figures/*.pdf
+figures/*.eps
+
+# OpenFOAM runtime output (large, regenerable)
+citicorp_cfd/0/
+citicorp_cfd/constant/polyMesh/
+citicorp_cfd/processor*/
+citicorp_cfd/postProcessing/
+citicorp_cfd/log.*
+citicorp_cfd/*.foam
+
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# IDE
+.vscode/
+*.swp
+*.swo
