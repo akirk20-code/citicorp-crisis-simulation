@@ -33,6 +33,8 @@ citicorp_cfd/*.foam
 Thumbs.db
 .DS_Store
 desktop.ini
+nul
+_ul
 
 # IDE
 .vscode/

@@ -75,11 +75,31 @@
 | Tool | Type | Verdict |
 |------|------|---------|
 | **MATLAB R2024b** | FEA + Monte Carlo + Visualization | **Selected** — no toolboxes, full control |
-| OpenFOAM | CFD (wind only) | Not needed — ASCE 7 analytical approach is sufficient |
+| **OpenFOAM v2312+** | CFD (steady RANS, k-omega SST) | **Implemented** — validates ASCE 7 analytical loads via 3D CFD |
 | CalculiX | FEA solver | Good but less visual for presentations |
 | Code_Aster | Industrial FEA | Overkill for educational demo |
 | FEniCS | Python FEA | Less visual than MATLAB |
 | SAP2000/ETABS | Commercial FEA | Not available |
+
+## OpenFOAM CFD Setup
+
+| Parameter | Value |
+|-----------|-------|
+| Solver | simpleFoam (steady-state, incompressible RANS) |
+| Turbulence model | k-omega SST |
+| Domain | 720 m × 720 m × 600 m (wind in +x) |
+| Base mesh | 36 × 36 × 30 cells (~20 m base resolution) |
+| Final mesh target | ~2–3 M cells (snappyHexMesh) |
+| Tower surface refinement | Level 3–4 (3–6 m cells) |
+| Surrounding bldg refinement | Level 2–3 (6–12 m cells) |
+| ABL inlet | Richards & Hoxey (1993): Uref = 44.7 m/s, Zref = 10 m, z0 = 0.1 m |
+| Surrounding buildings | 18 approximate boxes (Midtown East, heights 70–199 m) |
+| Parallel | 20 cores, scotch decomposition |
+| Post-processing | Forces on tower/stilts, y+, field min/max, residuals |
+
+ABL reference: Richards, P.J. and Hoxey, R.P. (1993). "Appropriate boundary conditions
+for computational wind engineering models using the k-epsilon turbulence model."
+*J. Wind Eng. Ind. Aerodyn.*, 46–47, 145–153.
 
 ## Key Simulation Decisions
 
