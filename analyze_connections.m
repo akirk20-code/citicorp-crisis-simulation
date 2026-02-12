@@ -246,20 +246,23 @@ function fig = analyze_connections(params, fea_results)
          'MarkerFaceColor', [1 0.3 0.3]);
 
     % Mark points outside the envelope
+    has_exceed = false;
     for b = 1:n_braces
         fv_q = frv_quar(b);
         ft_q = frt_quar(b);
         Fnt_prime_check = min(1.3*Fnt - (Fnt/(phi*Fnv))*fv_q, Fnt);
         if ft_q > phi * Fnt_prime_check || fv_q > phi * Fnv
             plot(fv_q, ft_q, 'x', 'Color', [1 1 0], 'MarkerSize', 14, 'LineWidth', 3);
+            has_exceed = true;
         end
     end
 
     xlabel('Required Shear Stress f_{rv} (ksi)','Color','w');
     ylabel('Required Tensile Stress f_{rt} (ksi)','Color','w');
     title('AISC J3-3a Bolt Interaction','Color','w','FontSize',12);
-    legend({'Capacity envelope','Perp. wind','Quart. wind (envelope)','Exceeds capacity'},...
-           'TextColor','w','Color',[0.15 0.15 0.15],'Location','northeast');
+    leg_entries = {'Capacity envelope','Perp. wind','Quart. wind (envelope)'};
+    if has_exceed, leg_entries{end+1} = 'Exceeds capacity'; end
+    legend(leg_entries, 'TextColor','w','Color',[0.15 0.15 0.15],'Location','northeast');
     grid on; set(ax3,'GridColor',[0.3 0.3 0.3]);
 
     % --- Panel 4: Force amplification visualization ---

@@ -42,9 +42,10 @@ params.stories       = 59;
 params.stilt_height  = 114;      % ft — 9-story stilts
 params.stilt_size    = 24;       % ft — stilt cross-section
 params.cantilever    = 72;       % ft — corner cantilever beyond stilt
-params.story_height  = (915 - 114) / 59;  % ft — typical story height (~13.6 ft)
+params.stories_above_stilts = 50; % 59 total - 9 stilt stories
+params.story_height  = (915 - 114) / 50;  % ft — story height above stilts (~16 ft)
 params.tier_stories  = 8;        % stories per chevron tier
-params.n_tiers       = 5;        % number of chevron tiers (covers 40 of 59 stories above stilts)
+params.n_tiers       = 6;        % "48 braces, in 6 tiers of 8" (Morgenstern 1995)
 
 % --- Structural steel properties ---
 params.E_steel       = 29000;    % ksi — Young's modulus

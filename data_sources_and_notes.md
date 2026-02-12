@@ -54,7 +54,7 @@
 | Structural damping | 1% of critical | Typical for steel |
 | TMD mass | 400 short tons | Wikipedia, PBS |
 | TMD damping effect | +8% (total ~9%) | Historical record |
-| Chevron tiers | 5 tiers of 8 stories each | Wikipedia |
+| Chevron tiers | 6 tiers of 8 stories each (48 braces total) | Morgenstern 1995 |
 | Bolted joints | ~200 total | Wikipedia |
 
 ## Wind Data

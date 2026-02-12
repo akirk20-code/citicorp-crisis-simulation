@@ -61,18 +61,21 @@ function fig = visualize_building_3d(params)
         end
     end
 
-    % ===== CHEVRON BRACING (inverted V pattern on each face) =====
-    tier_height = 8 * story_h; % 8-story tiers
+    % ===== CHEVRON BRACING (V pattern on each face) =====
+    % "48 braces, in 6 tiers of 8" — bracing does NOT go to roof
+    n_tiers = params.n_tiers;          % 6
+    tier_height = params.tier_stories * story_h;  % 8-story tiers
+    brace_top = Hs + n_tiers * tier_height;       % top of bracing zone
     brace_color = [0.2 0.8 1.0]; % Cyan
 
     % South face (y=0): chevrons in x-z plane
-    draw_chevrons(0, W, 0, 0, Hs, H, tier_height, 'y', brace_color);
+    draw_chevrons(0, W, 0, 0, Hs, brace_top, tier_height, 'y', brace_color);
     % North face (y=W)
-    draw_chevrons(0, W, W, W, Hs, H, tier_height, 'y', brace_color);
+    draw_chevrons(0, W, W, W, Hs, brace_top, tier_height, 'y', brace_color);
     % West face (x=0)
-    draw_chevrons(0, 0, 0, W, Hs, H, tier_height, 'x', brace_color);
+    draw_chevrons(0, 0, 0, W, Hs, brace_top, tier_height, 'x', brace_color);
     % East face (x=W)
-    draw_chevrons(W, W, 0, W, Hs, H, tier_height, 'x', brace_color);
+    draw_chevrons(W, W, 0, W, Hs, brace_top, tier_height, 'x', brace_color);
 
     % ===== SLOPED ROOF (45 degree crown) =====
     roof_peak = H + W/4; % approximate peak height
