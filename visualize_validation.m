@@ -235,7 +235,7 @@ function fig = visualize_validation(params, wind_results, fea_results)
         ''
         sprintf('  Wind Loading:')
         sprintf('    ASCE 7-22, Exposure %s', params.exposure)
-        sprintf('    V_{design} = %d mph (3-sec gust)', params.V_asce7_catII)
+        sprintf('    V_{design} = %d mph (fastest-mile, 1970 code)', params.V_design)
         sprintf('    G_f = %.3f (flexible, T_1 = %.1f s)', wind_results.Gf, params.T1)
         sprintf('    Base shear = %.0f kips', base_shear)
         ''

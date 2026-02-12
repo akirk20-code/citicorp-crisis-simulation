@@ -17,8 +17,13 @@ figures/*.pdf
 figures/*.eps
 
 # OpenFOAM runtime output (large, regenerable)
-citicorp_cfd/0/
+# Note: citicorp_cfd/0/ is NOT ignored — it contains initial/boundary conditions
+citicorp_cfd/[1-9]*/
 citicorp_cfd/constant/polyMesh/
+citicorp_cfd/constant/triSurface/*.stl
+citicorp_cfd/constant/triSurface/*.eMesh
+citicorp_cfd/constant/triSurface/*.obj
+citicorp_cfd/constant/extendedFeatureEdgeMesh/
 citicorp_cfd/processor*/
 citicorp_cfd/postProcessing/
 citicorp_cfd/log.*

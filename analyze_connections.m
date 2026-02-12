@@ -83,7 +83,7 @@ function fig = analyze_connections(params, fea_results)
     fprintf('    Auto-sized bolt group: %d bolts (D/C=%.2f under perp.)\n',...
             n_bolts, target_DC);
     fprintf('    Max brace force (perp.):   %.1f kips\n', F_max_perp);
-    fprintf('    Max brace force (quart.):  %.1f kips (= perp. x %.2f)\n',...
+    fprintf('    Max brace force (quart.):  %.1f kips (envelope of FEA + perp. x %.2f)\n',...
             F_max_quar, amp);
 
     %% ===== D/C RATIOS WITH AISC J3-3a INTERACTION =====
@@ -154,7 +154,7 @@ function fig = analyze_connections(params, fea_results)
 
     % Summary statistics
     fprintf('\n    D/C Ratio Summary (AISC J3-3a interaction, max across braces):\n');
-    fprintf('    %-30s  Perp.    Quart.(x%.1f)\n', 'Connection Type', amp);
+    fprintf('    %-30s  Perp.    Quart.(envelope)\n', 'Connection Type');
     fprintf('    %s\n', repmat('-', 1, 60));
     fprintf('    %-30s  %.3f    %.3f\n', 'A325 Bolted (J3-3a)', max(DC_bolt_perp), max(DC_bolt_quar));
     fprintf('    %-30s  %.3f    %.3f\n', 'CJP Groove Weld', max(DC_weld_perp), max(DC_weld_quar));
@@ -258,7 +258,7 @@ function fig = analyze_connections(params, fea_results)
     xlabel('Required Shear Stress f_{rv} (ksi)','Color','w');
     ylabel('Required Tensile Stress f_{rt} (ksi)','Color','w');
     title('AISC J3-3a Bolt Interaction','Color','w','FontSize',12);
-    legend({'Capacity envelope','Perp. wind','Quart. wind (x1.4)','Exceeds capacity'},...
+    legend({'Capacity envelope','Perp. wind','Quart. wind (envelope)','Exceeds capacity'},...
            'TextColor','w','Color',[0.15 0.15 0.15],'Location','northeast');
     grid on; set(ax3,'GridColor',[0.3 0.3 0.3]);
 
@@ -268,7 +268,7 @@ function fig = analyze_connections(params, fea_results)
 
     % Normalize forces and capacities to perpendicular demand
     F_norm_perp = 1.0;
-    F_norm_quar = amp;
+    F_norm_quar = F_max_quar / F_max_perp;
     C_weld_norm = Rn_CJP / F_max_perp;
     C_bolt_norm = Rn_shear_group / F_max_perp;
     C_repair_norm = Rn_repair / F_max_perp;

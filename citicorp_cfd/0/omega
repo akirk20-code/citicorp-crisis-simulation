@@ -1,0 +1,70 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      omega;
+}
+
+// omega = u_star / (kappa * sqrt(Cmu) * (z + z0))
+// At z=10m: 3.97 / (0.41 * 0.3 * 10.1) = 3.2 s^-1
+
+dimensions      [0 0 -1 0 0 0 0];
+
+internalField   uniform 3.2;
+
+boundaryField
+{
+    inlet
+    {
+        type            atmBoundaryLayerInletOmega;
+        flowDir         (1 0 0);
+        zDir            (0 0 1);
+        Uref            44.7;
+        Zref            10;
+        z0              uniform 0.1;
+        d               uniform 0;
+        value           uniform 3.2;
+    }
+
+    outlet
+    {
+        type            inletOutlet;
+        inletValue      uniform 3.2;
+        value           uniform 3.2;
+    }
+
+    ground
+    {
+        type            omegaWallFunction;
+        value           uniform 3.2;
+    }
+
+    top
+    {
+        type            slip;
+    }
+
+    sides
+    {
+        type            symmetry;
+    }
+
+    citicorp_tower
+    {
+        type            omegaWallFunction;
+        value           uniform 3.2;
+    }
+
+    citicorp_stilts
+    {
+        type            omegaWallFunction;
+        value           uniform 3.2;
+    }
+
+    surroundings
+    {
+        type            omegaWallFunction;
+        value           uniform 3.2;
+    }
+}

@@ -1,0 +1,212 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      snappyHexMeshDict;
+}
+
+castellatedMesh true;
+snap            true;
+addLayers       true;
+
+geometry
+{
+    citicorp_tower.stl
+    {
+        type triSurfaceMesh;
+        name citicorp_tower;
+    }
+
+    citicorp_stilts.stl
+    {
+        type triSurfaceMesh;
+        name citicorp_stilts;
+    }
+
+    surroundings.stl
+    {
+        type triSurfaceMesh;
+        name surroundings;
+    }
+
+    // Refinement region around the building
+    buildingRegion
+    {
+        type searchableBox;
+        min  (-60 -60 0);
+        max  (60 60 320);
+    }
+
+    // Wake refinement region (downstream)
+    wakeRegion
+    {
+        type searchableBox;
+        min  (24 -100 0);
+        max  (300 100 200);
+    }
+
+    // Stilt underpass region (fine resolution)
+    stiltRegion
+    {
+        type searchableBox;
+        min  (-30 -30 0);
+        max  (30 30 40);
+    }
+}
+
+castellatedMeshControls
+{
+    maxLocalCells       2000000;
+    maxGlobalCells      4000000;
+    minRefinementCells  10;
+    maxLoadUnbalance    0.10;
+    nCellsBetweenLevels 3;
+
+    features
+    (
+        {
+            file "citicorp_tower.eMesh";
+            level 4;
+        }
+        {
+            file "citicorp_stilts.eMesh";
+            level 4;
+        }
+        {
+            file "surroundings.eMesh";
+            level 3;
+        }
+    );
+
+    refinementSurfaces
+    {
+        citicorp_tower
+        {
+            level (3 4);
+            patchInfo
+            {
+                type wall;
+            }
+        }
+
+        citicorp_stilts
+        {
+            level (3 4);
+            patchInfo
+            {
+                type wall;
+            }
+        }
+
+        surroundings
+        {
+            level (2 3);
+            patchInfo
+            {
+                type wall;
+            }
+        }
+    }
+
+    resolveFeatureAngle 30;
+
+    refinementRegions
+    {
+        buildingRegion
+        {
+            mode inside;
+            levels ((1e15 2));
+        }
+
+        wakeRegion
+        {
+            mode inside;
+            levels ((1e15 1));
+        }
+
+        stiltRegion
+        {
+            mode inside;
+            levels ((1e15 3));
+        }
+    }
+
+    // Location inside domain, outside all buildings
+    locationInMesh (0 0 150);
+
+    allowFreeStandingZoneFaces true;
+}
+
+snapControls
+{
+    nSmoothPatch    3;
+    tolerance       2.0;
+    nSolveIter      100;
+    nRelaxIter      5;
+    nFeatureSnapIter 10;
+    implicitFeatureSnap false;
+    explicitFeatureSnap true;
+    multiRegionFeatureSnap false;
+}
+
+addLayersControls
+{
+    relativeSizes   true;
+
+    layers
+    {
+        citicorp_tower
+        {
+            nSurfaceLayers 3;
+        }
+        citicorp_stilts
+        {
+            nSurfaceLayers 3;
+        }
+        surroundings
+        {
+            nSurfaceLayers 2;
+        }
+        ground
+        {
+            nSurfaceLayers 2;
+        }
+    }
+
+    expansionRatio      1.2;
+    finalLayerThickness 0.3;
+    minThickness        0.1;
+    nGrow               0;
+    featureAngle        60;
+    slipFeatureAngle    30;
+    nRelaxIter          5;
+    nSmoothSurfaceNormals 1;
+    nSmoothNormals      3;
+    nSmoothThickness    10;
+    maxFaceThicknessRatio 0.5;
+    maxThicknessToMedialRatio 0.3;
+    minMedialAxisAngle  90;
+    nBufferCellsNoExtrude 0;
+    nLayerIter          50;
+}
+
+meshQualityControls
+{
+    maxNonOrtho     65;
+    maxBoundarySkewness 20;
+    maxInternalSkewness 4;
+    maxConcave      80;
+    minVol          1e-13;
+    minTetQuality   -1e30;
+    minArea         -1;
+    minTwist        0.02;
+    minDeterminant  0.001;
+    minFaceWeight   0.05;
+    minVolRatio     0.01;
+    minTriangleTwist -1;
+    nSmoothScale    4;
+    errorReduction  0.75;
+}
+
+mergeTolerance 1e-6;

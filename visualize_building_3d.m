@@ -176,8 +176,8 @@ end
 
 function draw_chevrons(x1, x2, y1, y2, z_bot, z_top, tier_h, fixed_axis, col)
 %DRAW_CHEVRONS  Draw V-bracing (chevron) on one face
-%  Citicorp chevrons: apex at top center of each tier,
-%  legs going DOWN to bottom corners. Each tier is one V.
+%  Citicorp chevrons: apex at bottom center of each tier (V shape),
+%  legs going from top corners DOWN to bottom midpoint.
     z = z_bot;
     while z + tier_h <= z_top
         top_z = z + tier_h;
@@ -185,14 +185,14 @@ function draw_chevrons(x1, x2, y1, y2, z_bot, z_top, tier_h, fixed_axis, col)
         if strcmp(fixed_axis, 'y')
             % Face is in x-z plane, y is fixed
             xm = (x1 + x2)/2;
-            % V: from bottom corners up to top center
-            plot3([x1 xm], [y1 y1], [z top_z], '-', 'Color', col, 'LineWidth', 2);
-            plot3([x2 xm], [y2 y2], [z top_z], '-', 'Color', col, 'LineWidth', 2);
+            % V: from top corners down to bottom center
+            plot3([x1 xm], [y1 y1], [top_z z], '-', 'Color', col, 'LineWidth', 2);
+            plot3([x2 xm], [y2 y2], [top_z z], '-', 'Color', col, 'LineWidth', 2);
         else
             % Face is in y-z plane, x is fixed
             ym = (y1 + y2)/2;
-            plot3([x1 x1], [y1 ym], [z top_z], '-', 'Color', col, 'LineWidth', 2);
-            plot3([x2 x2], [y2 ym], [z top_z], '-', 'Color', col, 'LineWidth', 2);
+            plot3([x1 x1], [y1 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2);
+            plot3([x2 x2], [y2 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2);
         end
 
         z = z + tier_h;

@@ -283,7 +283,7 @@ function fig = monte_carlo_reliability(params)
         '\bf{Annual Failure Probabilities:}'
         sprintf('  1. Design (welded):    P_f = %.2e  (T=%.0f yr)', P_fail_exact(1), T_return_exact(1))
         sprintf('  2. Bolted (perp.):     P_f = %.2e  (T=%.0f yr)', P_fail_exact(2), T_return_exact(2))
-        sprintf('  3. Bolted+quart-TMD:   P_f = %.2e  (T=%.0f yr)', P_fail_exact(3), T_return_exact(3))
+        sprintf('  3. Bolted+quart,NO TMD: P_f = %.2e  (T=%.0f yr)', P_fail_exact(3), T_return_exact(3))
         sprintf('  4. Bolted+quart+TMD:   P_f = %.2e  (T=%.0f yr)', P_fail_exact(4), T_return_exact(4))
         ''
         '\bf{The Crisis:}'

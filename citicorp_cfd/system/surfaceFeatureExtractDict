@@ -1,0 +1,43 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      surfaceFeatureExtractDict;
+}
+
+citicorp_tower.stl
+{
+    extractionMethod    extractFromSurface;
+
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   150;
+    }
+
+    writeObj            yes;
+}
+
+citicorp_stilts.stl
+{
+    extractionMethod    extractFromSurface;
+
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   150;
+    }
+
+    writeObj            yes;
+}
+
+surroundings.stl
+{
+    extractionMethod    extractFromSurface;
+
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   150;
+    }
+
+    writeObj            yes;
+}

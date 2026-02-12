@@ -1,0 +1,28 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Citicorp Center CFD — Clean script
+# Removes all generated files, keeping only the case setup
+#------------------------------------------------------------------------------
+
+cd "${0%/*}" || exit 1
+. ${WM_PROJECT_DIR:?}/bin/tools/CleanFunctions
+
+cleanCase
+
+# Remove generated STL files
+rm -f constant/triSurface/citicorp_tower.stl
+rm -f constant/triSurface/citicorp_stilts.stl
+rm -f constant/triSurface/surroundings.stl
+
+# Remove extracted features
+rm -rf constant/extendedFeatureEdgeMesh
+rm -f constant/triSurface/*.eMesh
+rm -f constant/triSurface/*.obj
+
+# Remove parallel directories
+rm -rf processor*
+
+# Remove postProcessing
+rm -rf postProcessing
+
+echo "Case cleaned."

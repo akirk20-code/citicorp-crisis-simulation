@@ -1,0 +1,79 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Citicorp Center CFD — Complete run script
+# Steady-state RANS (simpleFoam, k-omega SST) with ABL inlet
+#
+# Prerequisites:
+#   - OpenFOAM v2312+ (ESI) sourced
+#   - Python 3 available
+#   - ~2-3M cells, runs in ~10 min on 20 cores
+#------------------------------------------------------------------------------
+
+cd "${0%/*}" || exit 1    # Run from this directory
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+
+NPROCS=20
+
+echo "=========================================="
+echo " Citicorp Center CFD Simulation"
+echo " simpleFoam | k-omega SST | ABL inlet"
+echo "=========================================="
+
+# --- Step 1: Generate STL geometry ---
+echo ""
+echo "Step 1: Generating STL geometry..."
+python3 generate_stl.py
+if [ $? -ne 0 ]; then
+    echo "ERROR: STL generation failed"
+    exit 1
+fi
+
+# --- Step 2: Extract surface features ---
+echo ""
+echo "Step 2: Extracting surface features..."
+runApplication surfaceFeatureExtract
+
+# --- Step 3: Background mesh ---
+echo ""
+echo "Step 3: Creating background mesh (blockMesh)..."
+runApplication blockMesh
+
+# --- Step 4: Decompose for parallel snappyHexMesh ---
+echo ""
+echo "Step 4: Decomposing for parallel mesh generation..."
+runApplication decomposePar -copyZero
+
+# --- Step 5: Parallel snappyHexMesh ---
+echo ""
+echo "Step 5: Running snappyHexMesh on $NPROCS cores..."
+runParallel snappyHexMesh -overwrite
+
+# --- Step 6: Reconstruct mesh ---
+echo ""
+echo "Step 6: Reconstructing mesh..."
+runApplication reconstructParMesh -constant
+
+# --- Step 7: Clean parallel decomposition ---
+rm -rf processor*
+
+# --- Step 8: Decompose for solver ---
+echo ""
+echo "Step 8: Decomposing for solver..."
+runApplication -s solver decomposePar
+
+# --- Step 9: Run simpleFoam ---
+echo ""
+echo "Step 9: Running simpleFoam on $NPROCS cores..."
+runParallel simpleFoam
+
+# --- Step 10: Reconstruct solution ---
+echo ""
+echo "Step 10: Reconstructing solution..."
+runApplication -s solver reconstructPar -latestTime
+
+echo ""
+echo "=========================================="
+echo " Simulation complete!"
+echo " Check postProcessing/ for forces and residuals"
+echo " Use paraFoam or ParaView to visualize"
+echo "=========================================="

@@ -44,9 +44,9 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
                 [W,W], [W/2,W], [0,W];      % North (y=W)
                 [0,W], [0,W/2], [0,0]};     % West  (x=0)
 
-    % Create nodes at tier boundaries (including base at Hs) and chevron peaks
+    % Create nodes at tier boundaries (including base at Hs)
+    % V-bracing uses only tier-level nodes — no mid-tier peak nodes needed
     tier_nodes = zeros(4, n_tiers+1, 3);  % face, level, position -> node_id
-    peak_nodes = zeros(4, n_tiers);       % face, tier -> peak node_id
 
     for f = 1:4
         for t = 0:n_tiers
@@ -55,12 +55,6 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
                 xy = face_pts{f, p};
                 tier_nodes(f, t+1, p) = add_unique_node([xy(1), xy(2), z_lev]);
             end
-        end
-        % Chevron peak nodes (mid-tier height, at face midpoint)
-        for t = 1:n_tiers
-            z_peak = Hs + (t-1)*tier_h + tier_h/2;
-            xy = face_pts{f, 2};  % midpoint of face
-            peak_nodes(f, t) = add_unique_node([xy(1), xy(2), z_peak]);
         end
     end
 
@@ -91,20 +85,18 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
         end
     end
 
-    % --- Chevron braces (inverted V on each face) ---
+    % --- Chevron braces (V on each face) ---
+    % Matching the real Citicorp structure: each tier has one V with apex
+    % at the bottom-center (face midpoint) and legs from top corners down.
+    % 2 brace members per tier per face.
     for f = 1:4
         for t = 1:n_tiers
-            pk = peak_nodes(f, t);
-            bl = tier_nodes(f, t, 1);    % bottom-left
-            br = tier_nodes(f, t, 3);    % bottom-right
-            tl = tier_nodes(f, t+1, 1);  % top-left
-            tr = tier_nodes(f, t+1, 3);  % top-right
-            % Lower V
-            add_elem(bl, pk, A_brace, I_brace, 2);
-            add_elem(br, pk, A_brace, I_brace, 2);
-            % Upper inverted V
-            add_elem(pk, tl, A_brace, I_brace, 2);
-            add_elem(pk, tr, A_brace, I_brace, 2);
+            tl = tier_nodes(f, t+1, 1);    % top-left corner
+            tr = tier_nodes(f, t+1, 3);    % top-right corner
+            bm = tier_nodes(f, t, 2);      % bottom midpoint (V apex)
+            % V: top corners down to bottom center
+            add_elem(tl, bm, A_brace, I_brace, 2);
+            add_elem(tr, bm, A_brace, I_brace, 2);
         end
     end
 
@@ -113,19 +105,6 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
         for t = 1:n_tiers+1
             add_elem(tier_nodes(f,t,1), tier_nodes(f,t,2), A_beam, I_beam, 3);
             add_elem(tier_nodes(f,t,2), tier_nodes(f,t,3), A_beam, I_beam, 3);
-        end
-    end
-
-    % --- Horizontal tie beams connecting chevron peaks to face midpoints ---
-    % (provides in-plane stability at peak levels)
-    for f = 1:4
-        for t = 1:n_tiers
-            pk = peak_nodes(f, t);
-            % Connect peak to the column mid-node above and below
-            mid_bot = tier_nodes(f, t, 2);
-            mid_top = tier_nodes(f, t+1, 2);
-            add_elem(mid_bot, pk, A_beam, I_beam, 3);
-            add_elem(pk, mid_top, A_beam, I_beam, 3);
         end
     end
 
@@ -152,20 +131,6 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
         add_elem(em, nm, A_beam * 2, I_beam * 4, 3);
         add_elem(nm, wm, A_beam * 2, I_beam * 4, 3);
         add_elem(wm, sm, A_beam * 2, I_beam * 4, 3);
-    end
-
-    % Diaphragm connections at chevron peak levels too
-    for t = 1:n_tiers
-        sp = peak_nodes(1, t);  % South peak
-        np = peak_nodes(3, t);  % North peak
-        ep = peak_nodes(2, t);  % East peak
-        wp = peak_nodes(4, t);  % West peak
-        add_elem(sp, np, A_diaphragm, I_diaphragm, 3);
-        add_elem(ep, wp, A_diaphragm, I_diaphragm, 3);
-        add_elem(sp, ep, A_beam * 2, I_beam * 4, 3);
-        add_elem(ep, np, A_beam * 2, I_beam * 4, 3);
-        add_elem(np, wp, A_beam * 2, I_beam * 4, 3);
-        add_elem(wp, sp, A_beam * 2, I_beam * 4, 3);
     end
 
     n_elem = size(elements, 1);
