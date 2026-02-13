@@ -1,7 +1,7 @@
 function fig = analyze_connections(params, fea_results)
 %ANALYZE_CONNECTIONS  AISC 360-22 connection capacity analysis
 %  Compares demand (from FEA) vs capacity for bolted and welded connections.
-%  Applies LeMessurier's 40% quartering force amplification to critical braces.
+%  Uses FEA-derived quartering forces (no hardcoded amplification factor).
 %  Implements bolt combined tension-shear interaction per AISC Eq. J3-3a.
 
     %% ===== AISC 360-22 CONNECTION CAPACITIES =====
@@ -42,26 +42,18 @@ function fig = analyze_connections(params, fea_results)
     % Perpendicular brace forces (from 3D FEA)
     F_brace_perp = abs(fea_results.brace_forces_perp);  % kips
 
-    % Quartering brace forces — two independent estimates, take envelope:
-    %
-    % Method A: FEA quartering results directly from 3D analysis
-    F_brace_quar_fea = abs(fea_results.brace_forces_quar);  % kips
-    %
-    % Method B: LeMessurier (1978) amplification of perpendicular forces
-    %   Our simplified FEA distributes quartering loads across all braces,
-    %   but the real diamond-shaped stilt arrangement concentrates forces
-    %   in specific braces. LeMessurier's detailed analysis showed ~40%
-    %   increase in critical brace members under quartering vs perpendicular.
-    amp = params.quartering_force_factor;  % 1.40
-    F_brace_quar_amp = F_brace_perp * amp;
-    %
-    % Envelope: conservative maximum of both methods per brace
-    F_brace_quar = max(F_brace_quar_fea, F_brace_quar_amp);
+    % Quartering brace forces — DERIVED directly from FEA (no hardcoded factor)
+    F_brace_quar = abs(fea_results.brace_forces_quar);  % kips
 
-    fprintf('    Quartering force methods:\n');
-    fprintf('      FEA direct max:       %.1f kips\n', max(F_brace_quar_fea));
-    fprintf('      Amplified perp. max:  %.1f kips (perp. x %.2f)\n', max(F_brace_quar_amp), amp);
-    fprintf('      Envelope max:         %.1f kips (governs)\n', max(F_brace_quar));
+    % DERIVED amplification factor (compare with historical 1.40)
+    amp_derived = max(F_brace_quar) / max(max(F_brace_perp), 0.001);
+    amp_historical = params.quartering_force_factor;  % 1.40 (LeMessurier)
+
+    fprintf('    Quartering brace forces (from FEA, no hardcoded factor):\n');
+    fprintf('      Max perp. force:       %.1f kips\n', max(F_brace_perp));
+    fprintf('      Max quar. force (FEA): %.1f kips\n', max(F_brace_quar));
+    fprintf('      DERIVED amplification: %.2f (quartering / perpendicular)\n', amp_derived);
+    fprintf('      VALIDATION: historical = %.2f (LeMessurier 1978)\n', amp_historical);
 
     % Brace geometry — diagonal angle affects force decomposition at gusset
     theta = atand(params.tier_stories * params.story_height / (params.width/2));
@@ -83,8 +75,8 @@ function fig = analyze_connections(params, fea_results)
     fprintf('    Auto-sized bolt group: %d bolts (D/C=%.2f under perp.)\n',...
             n_bolts, target_DC);
     fprintf('    Max brace force (perp.):   %.1f kips\n', F_max_perp);
-    fprintf('    Max brace force (quart.):  %.1f kips (envelope of FEA + perp. x %.2f)\n',...
-            F_max_quar, amp);
+    fprintf('    Max brace force (quart.):  %.1f kips (FEA-derived, amp=%.2f)\n',...
+            F_max_quar, amp_derived);
 
     %% ===== D/C RATIOS WITH AISC J3-3a INTERACTION =====
     n_braces = length(F_brace_perp);
@@ -154,7 +146,7 @@ function fig = analyze_connections(params, fea_results)
 
     % Summary statistics
     fprintf('\n    D/C Ratio Summary (AISC J3-3a interaction, max across braces):\n');
-    fprintf('    %-30s  Perp.    Quart.(envelope)\n', 'Connection Type');
+    fprintf('    %-30s  Perp.    Quart.(FEA)\n', 'Connection Type');
     fprintf('    %s\n', repmat('-', 1, 60));
     fprintf('    %-30s  %.3f    %.3f\n', 'A325 Bolted (J3-3a)', max(DC_bolt_perp), max(DC_bolt_quar));
     fprintf('    %-30s  %.3f    %.3f\n', 'CJP Groove Weld', max(DC_weld_perp), max(DC_weld_quar));
@@ -260,7 +252,7 @@ function fig = analyze_connections(params, fea_results)
     xlabel('Required Shear Stress f_{rv} (ksi)','Color','w');
     ylabel('Required Tensile Stress f_{rt} (ksi)','Color','w');
     title('AISC J3-3a Bolt Interaction','Color','w','FontSize',12);
-    leg_entries = {'Capacity envelope','Perp. wind','Quart. wind (envelope)'};
+    leg_entries = {'Capacity envelope','Perp. wind','Quart. wind (FEA)'};
     if has_exceed, leg_entries{end+1} = 'Exceeds capacity'; end
     legend(leg_entries, 'TextColor','w','Color',[0.15 0.15 0.15],'Location','northeast');
     grid on; set(ax3,'GridColor',[0.3 0.3 0.3]);
@@ -287,7 +279,7 @@ function fig = analyze_connections(params, fea_results)
     yline(1.0, ':', 'Color', [0.5 0.5 0.5], 'LineWidth', 1);
 
     set(ax4, 'XTick', x_pos, 'XTickLabel', ...
-        {'Perp.','Quart.\newline(+40%)','Weld','Bolt','Repair'});
+        {'Perp.',sprintf('Quart.\n(%.0f%%)',amp_derived*100-100),'Weld','Bolt','Repair'});
     ylabel('Normalized to Perp. Demand','Color','w');
     title('Demand vs Capacity','Color','w','FontSize',12);
     grid on; set(ax4,'GridColor',[0.3 0.3 0.3]);
@@ -311,7 +303,7 @@ function fig = analyze_connections(params, fea_results)
         sprintf('  Perp. D/C = %.2f (AISC J3-3a)  \\rightarrow  PASSES', max(DC_bolt_perp))
         ''
         '\bf{Step 4:} LeMessurier (1978) checked \bf{quartering winds}'
-        sprintf('  Quartering amplifies critical brace forces by %.0f%%', (amp-1)*100)
+        sprintf('  Quartering amplifies critical brace forces by %.0f%% (FEA-derived)', (amp_derived-1)*100)
         sprintf('  Quart. D/C = %.2f (J3-3a)  \\rightarrow  \\bf{FAILS}', max(DC_bolt_quar))
         ''
         '\bf{Step 5:} Emergency repair — 2" welded cover plates'

@@ -1,6 +1,7 @@
 function fig = visualize_building_3d(params)
 %VISUALIZE_BUILDING_3D  3D rendering of the Citicorp Center structural system
 %  Shows the unique column placement, chevron bracing, and TMD location.
+%  Clean structural frame view — orange bracing, gold stilts, no floor plates.
 
     W = params.width;       % 157 ft square plan
     H = params.height;      % 915 ft total
@@ -15,26 +16,24 @@ function fig = visualize_building_3d(params)
     ax1 = subplot(1,2,1); hold on;
     set(ax1,'Color','k','XColor','w','YColor','w','ZColor','w');
 
-    % Floor plates (every 8 stories for clarity)
     story_h = (H - Hs) / params.stories;
-    for i = 0:8:params.stories
-        z = Hs + i * story_h;
-        if z > H, break; end
-        floor_x = [0 W W 0 0];
-        floor_y = [0 0 W W 0];
-        floor_z = z * ones(1,5);
-        plot3(floor_x, floor_y, floor_z, '-', 'Color', [0.3 0.3 0.5], 'LineWidth', 0.5);
-    end
 
-    % Ground plane
-    fill3([0 W W 0], [0 0 W W], [0 0 0 0], [0.15 0.15 0.15],...
-          'EdgeColor',[0.3 0.3 0.3], 'FaceAlpha', 0.5);
+    % Ground plane (subtle)
+    fill3([0 W W 0], [0 0 W W], [0 0 0 0], [0.12 0.12 0.12],...
+          'EdgeColor',[0.25 0.25 0.25], 'FaceAlpha', 0.3);
 
-    % Corner vertical edges of the tower
+    % Corner vertical edges of the tower (subtle structural outline)
+    edge_color = [0.6 0.4 0.15];  % Dark orange
     corners = [0 0; W 0; W W; 0 W];
     for c = 1:4
         plot3([corners(c,1) corners(c,1)], [corners(c,2) corners(c,2)],...
-              [Hs H], '-', 'Color', [0.4 0.4 0.6], 'LineWidth', 1);
+              [Hs H], '-', 'Color', edge_color, 'LineWidth', 1.5);
+    end
+
+    % Horizontal edges at stilt top and roof
+    for z_lvl = [Hs, H]
+        plot3([0 W W 0 0], [0 0 W W 0], z_lvl*ones(1,5), ...
+              '-', 'Color', edge_color, 'LineWidth', 1.5);
     end
 
     % ===== STILTS (at midpoints of each face, NOT corners) =====
@@ -61,21 +60,57 @@ function fig = visualize_building_3d(params)
         end
     end
 
-    % ===== CHEVRON BRACING (V pattern on each face) =====
-    % "48 braces, in 6 tiers of 8" — bracing does NOT go to roof
+    % ===== TRANSFER ZONE (base stories above stilts) =====
+    if isfield(params, 'transfer_stories') && params.transfer_stories > 0
+        n_transfer = params.transfer_stories;
+    else
+        n_transfer = 0;
+    end
     n_tiers = params.n_tiers;          % 6
     tier_height = params.tier_stories * story_h;  % 8-story tiers
-    brace_top = Hs + n_tiers * tier_height;       % top of bracing zone
-    brace_color = [0.2 0.8 1.0]; % Cyan
+    brace_base = Hs + n_transfer * story_h;  % V-bracing starts above transfer
+    brace_top = brace_base + n_tiers * tier_height;
+    brace_color = [1.0 0.55 0.0]; % Orange
+    xfer_color  = [1.0 0.4 0.8];  % Magenta
+
+    if n_transfer > 0
+        % Transfer V: stilt midpoint at Hs spreads to corners at brace_base
+        % Horizontal at top of transfer zone
+        plot3([0 W W 0 0], [0 0 W W 0], brace_base*ones(1,5), ...
+              '-', 'Color', edge_color, 'LineWidth', 1.5);
+        % South face: stilt center up to corners
+        draw_transfer_v(0, W, 0, 0, Hs, brace_base, 'y', xfer_color);
+        % North face
+        draw_transfer_v(0, W, W, W, Hs, brace_base, 'y', xfer_color);
+        % West face
+        draw_transfer_v(0, 0, 0, W, Hs, brace_base, 'x', xfer_color);
+        % East face
+        draw_transfer_v(W, W, 0, W, Hs, brace_base, 'x', xfer_color);
+    end
+
+    % ===== CHEVRON BRACING (V pattern on each face) =====
+    % "48 braces, in 6 tiers of 8" — V-braces start above transfer zone
 
     % South face (y=0): chevrons in x-z plane
-    draw_chevrons(0, W, 0, 0, Hs, brace_top, tier_height, 'y', brace_color);
+    draw_chevrons(0, W, 0, 0, brace_base, brace_top, tier_height, 'y', brace_color);
     % North face (y=W)
-    draw_chevrons(0, W, W, W, Hs, brace_top, tier_height, 'y', brace_color);
+    draw_chevrons(0, W, W, W, brace_base, brace_top, tier_height, 'y', brace_color);
     % West face (x=0)
-    draw_chevrons(0, 0, 0, W, Hs, brace_top, tier_height, 'x', brace_color);
+    draw_chevrons(0, 0, 0, W, brace_base, brace_top, tier_height, 'x', brace_color);
     % East face (x=W)
-    draw_chevrons(W, W, 0, W, Hs, brace_top, tier_height, 'x', brace_color);
+    draw_chevrons(W, W, 0, W, brace_base, brace_top, tier_height, 'x', brace_color);
+
+    % ===== TIER BOUNDARY RINGS (closed perimeter at each tier top) =====
+    % Floor diaphragms connect chevron bracing on all 4 faces at corners,
+    % forming closed rectangular rings — critical for quartering wind transfer.
+    ring_color = brace_color * 0.6;  % Subdued orange
+    z_tier = brace_base;
+    while z_tier + tier_height <= brace_top + 0.1
+        tz = min(z_tier + tier_height, brace_top);
+        plot3([0 W W 0 0], [0 0 W W 0], tz*ones(1,5), ...
+              '-', 'Color', ring_color, 'LineWidth', 1.3);
+        z_tier = z_tier + tier_height;
+    end
 
     % ===== SLOPED ROOF (45 degree crown) =====
     roof_peak = H + W/4; % approximate peak height
@@ -85,7 +120,7 @@ function fig = visualize_building_3d(params)
     plot3([0 W/2 W], [W W/2 W], [H roof_peak H], '-', 'Color', roof_color, 'LineWidth', 2);
     % Ridge line
     plot3([W/2 W/2], [0 W], [roof_peak roof_peak], '-', 'Color', roof_color, 'LineWidth', 2);
-    % Roof edges
+    % Roof side edges
     plot3([0 0], [0 W], [H H], '-', 'Color', roof_color, 'LineWidth', 1);
     plot3([W W], [0 W], [H H], '-', 'Color', roof_color, 'LineWidth', 1);
 
@@ -131,7 +166,6 @@ function fig = visualize_building_3d(params)
     rectangle('Position',[0 0 W W],'EdgeColor','w','LineWidth',2);
 
     % Stilt positions (midpoints)
-    stilt_labels = {'South','East','North','West'};
     for s = 1:4
         cx = stilt_positions(s,1);
         cy = stilt_positions(s,2);
@@ -173,8 +207,29 @@ function fig = visualize_building_3d(params)
     text(W+10, W-20, 'Columns at midpoints', 'Color', stilt_colors, 'FontSize', 9);
     text(W+10, W-40, 'No corner support', 'Color', 'r', 'FontSize', 9);
     text(W+10, W-60, '72 ft cantilevers', 'Color', annotation_color, 'FontSize', 9);
+    text(W+10, W-80, 'Chevron V-bracing', 'Color', brace_color, 'FontSize', 9);
+    text(W+10, W-100, 'Tier boundary rings', 'Color', brace_color*0.6, 'FontSize', 9);
+    if n_transfer > 0
+        text(W+10, W-120, 'Transfer zone', 'Color', xfer_color, 'FontSize', 9);
+    end
 
     sgtitle('Module 1: Citicorp Center 3D Structural System','Color','w','FontSize',16,'FontWeight','bold');
+end
+
+function draw_transfer_v(x1, x2, y1, y2, z_bot, z_top, fixed_axis, col)
+%DRAW_TRANSFER_V  Draw transfer V in the base zone (stilt center to corners)
+%  Inverted V: apex at bottom-center (stilt midpoint), legs up to corners.
+    if strcmp(fixed_axis, 'y')
+        xm = (x1 + x2)/2;
+        % From stilt center (bottom) up to left corner (top)
+        plot3([xm x1], [y1 y1], [z_bot z_top], '-', 'Color', col, 'LineWidth', 2.5);
+        % From stilt center (bottom) up to right corner (top)
+        plot3([xm x2], [y2 y2], [z_bot z_top], '-', 'Color', col, 'LineWidth', 2.5);
+    else
+        ym = (y1 + y2)/2;
+        plot3([x1 x1], [ym y1], [z_bot z_top], '-', 'Color', col, 'LineWidth', 2.5);
+        plot3([x2 x2], [ym y2], [z_bot z_top], '-', 'Color', col, 'LineWidth', 2.5);
+    end
 end
 
 function draw_chevrons(x1, x2, y1, y2, z_bot, z_top, tier_h, fixed_axis, col)
@@ -182,21 +237,22 @@ function draw_chevrons(x1, x2, y1, y2, z_bot, z_top, tier_h, fixed_axis, col)
 %  Citicorp chevrons: apex at bottom center of each tier (V shape),
 %  legs going from top corners DOWN to bottom midpoint.
     z = z_bot;
-    while z + tier_h <= z_top
-        top_z = z + tier_h;
+    while z + tier_h <= z_top + 0.1
+        top_z = min(z + tier_h, z_top);
 
         if strcmp(fixed_axis, 'y')
             % Face is in x-z plane, y is fixed
             xm = (x1 + x2)/2;
             % V: from top corners down to bottom center
-            plot3([x1 xm], [y1 y1], [top_z z], '-', 'Color', col, 'LineWidth', 2);
-            plot3([x2 xm], [y2 y2], [top_z z], '-', 'Color', col, 'LineWidth', 2);
+            plot3([x1 xm], [y1 y1], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+            plot3([x2 xm], [y2 y2], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
         else
             % Face is in y-z plane, x is fixed
             ym = (y1 + y2)/2;
-            plot3([x1 x1], [y1 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2);
-            plot3([x2 x2], [y2 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2);
+            plot3([x1 x1], [y1 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+            plot3([x2 x2], [y2 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
         end
+        % Note: horizontal chords drawn as full perimeter rings in main function
 
         z = z + tier_h;
     end

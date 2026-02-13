@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Citicorp Center CFD Simulation Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160/examples/js/controls/OrbitControls.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0e1a; color: #e0e6f0; }
+.header { background: linear-gradient(135deg, #1a1f35 0%, #0d1225 100%); padding: 24px 32px; border-bottom: 1px solid #2a3050; }
+.header h1 { font-size: 1.6em; color: #7eb8ff; margin-bottom: 4px; }
+.header .subtitle { color: #8899bb; font-size: 0.95em; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; max-width: 1600px; margin: 0 auto; }
+.card { background: #111827; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; }
+.card h2 { font-size: 1.1em; color: #7eb8ff; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #1e293b; }
+.card.full { grid-column: 1 / -1; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+table th { text-align: left; color: #8899bb; font-weight: 500; padding: 4px 8px; border-bottom: 1px solid #1e293b; }
+table td { padding: 4px 8px; border-bottom: 1px solid #0d1117; }
+table td:first-child { color: #a0b0cc; font-family: 'Consolas', monospace; }
+table td:last-child { color: #c0d0e8; font-family: 'Consolas', monospace; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; }
+.tag-green { background: #064e3b; color: #6ee7b7; }
+.tag-yellow { background: #713f12; color: #fcd34d; }
+.tag-blue { background: #1e3a5f; color: #93c5fd; }
+.tag-red { background: #7f1d1d; color: #fca5a5; }
+#stl-viewer { width: 100%; height: 450px; background: #070b14; border-radius: 4px; cursor: grab; }
+#stl-viewer:active { cursor: grabbing; }
+#residual-chart { width: 100%; height: 350px; }
+.status-bar { display: flex; gap: 24px; padding: 8px 0; }
+.status-item { display: flex; flex-direction: column; }
+.status-item .label { font-size: 0.75em; color: #667; text-transform: uppercase; letter-spacing: 0.5px; }
+.status-item .value { font-size: 1.3em; font-weight: 600; color: #7eb8ff; font-family: 'Consolas', monospace; }
+.note { font-size: 0.8em; color: #667; margin-top: 8px; font-style: italic; }
+.bc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bc-patch { background: #0d1117; border: 1px solid #1e293b; border-radius: 4px; padding: 8px; }
+.bc-patch .name { color: #7eb8ff; font-weight: 600; font-size: 0.85em; margin-bottom: 4px; }
+.bc-patch .type { color: #a0b0cc; font-size: 0.78em; font-family: 'Consolas', monospace; }
+.viewer-controls { display: flex; gap: 8px; margin-bottom: 8px; }
+.viewer-controls button { background: #1e293b; color: #93c5fd; border: 1px solid #2a3050; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 0.8em; }
+.viewer-controls button:hover { background: #2a3050; }
+.viewer-controls button.active { background: #1e3a5f; border-color: #3b82f6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Citicorp Center Wind Load CFD Simulation</h1>
+  <div class="subtitle">OR 750 Reliability, Safety, and Risk Analysis &mdash; George Mason University &mdash; OpenFOAM 13 Foundation (k-&omega; SST, SIMPLE)</div>
+</div>
+
+<div class="grid">
+
+  <!-- Status Overview -->
+  <div class="card full">
+    <h2>Simulation Status</h2>
+    <div class="status-bar">
+      <div class="status-item"><span class="label">Mesh Cells</span><span class="value">3,161,774</span></div>
+      <div class="status-item"><span class="label">Buildings</span><span class="value">707</span></div>
+      <div class="status-item"><span class="label">Solver</span><span class="value">incompressibleFluid</span></div>
+      <div class="status-item"><span class="label">Turbulence</span><span class="value">k-&omega; SST</span></div>
+      <div class="status-item"><span class="label">Target Iterations</span><span class="value">3,000</span></div>
+      <div class="status-item"><span class="label">Status</span><span class="value"><span class="tag tag-green">Running</span></span></div>
+      <div class="status-item"><span class="label">Cores</span><span class="value">10</span></div>
+      <div class="status-item"><span class="label">Hardware</span><span class="value">Ultra 9 185H</span></div>
+    </div>
+  </div>
+
+  <!-- 3D Mesh Viewer -->
+  <div class="card full">
+    <h2>3D Building Geometry (NYC Open Data Footprints API &mdash; 707 buildings)</h2>
+    <div class="viewer-controls">
+      <button onclick="resetCamera()" class="active">Perspective</button>
+      <button onclick="viewTop()">Top</button>
+      <button onclick="viewFront()">Front (Wind dir &rarr;)</button>
+      <button onclick="viewSide()">Side</button>
+      <button onclick="toggleWireframe()">Wireframe</button>
+    </div>
+    <div id="stl-viewer"></div>
+    <div class="note">Drag to orbit, scroll to zoom. Citicorp tower (blue) with 4 stilts (cyan). 707 surrounding buildings (gray). Wind from left (+X). Coordinates in meters, origin at Citicorp Center.</div>
+  </div>
+
+  <!-- Residual Convergence -->
+  <div class="card full">
+    <h2>Residual Convergence History</h2>
+    <canvas id="residual-chart"></canvas>
+    <div class="note">SIMPLE steady-state solver. Relaxation: U=0.3, k=0.3, &omega;=0.3, p=0.2. First-order upwind for U (stability phase). Target: all residuals &lt; 10<sup>-4</sup>.</div>
+  </div>
+
+  <!-- Mesh Quality -->
+  <div class="card">
+    <h2>Mesh Statistics</h2>
+    <table>
+      <tr><th>Parameter</th><th>Value</th></tr>
+      <tr><td>Total cells</td><td>3,161,774</td></tr>
+      <tr><td>Total faces</td><td>10,025,245</td></tr>
+      <tr><td>Total points</td><td>3,716,418</td></tr>
+      <tr><td>Level 0 (base 15m)</td><td>47,740</td></tr>
+      <tr><td>Level 1 (7.5m)</td><td>230,146</td></tr>
+      <tr><td>Level 2 (3.75m)</td><td>536,380</td></tr>
+      <tr><td>Level 3 (1.875m)</td><td>2,222,714</td></tr>
+      <tr><td>Level 4 (0.94m)</td><td>124,794</td></tr>
+    </table>
+    <h2 style="margin-top:16px;">Mesh Quality</h2>
+    <table>
+      <tr><td>Non-orthogonality &gt; 65&deg;</td><td><span class="tag tag-green">0</span></td></tr>
+      <tr><td>Negative volume pyramids</td><td><span class="tag tag-green">0</span></td></tr>
+      <tr><td>Concavity &gt; 80&deg;</td><td><span class="tag tag-green">0</span></td></tr>
+      <tr><td>Skewness &gt; 4 (int) / 20 (bdy)</td><td><span class="tag tag-green">0</span></td></tr>
+      <tr><td>Low interp. weights (&lt;0.05)</td><td><span class="tag tag-yellow">86</span></td></tr>
+      <tr><td>Volume ratio &lt; 0.01</td><td><span class="tag tag-green">0</span></td></tr>
+      <tr><td>Face twist &lt; 0.02</td><td><span class="tag tag-green">0</span></td></tr>
+    </table>
+  </div>
+
+  <!-- Domain & Physics -->
+  <div class="card">
+    <h2>Domain &amp; Flow Conditions</h2>
+    <table>
+      <tr><th>Parameter</th><th>Value</th></tr>
+      <tr><td>Domain size</td><td>720 &times; 720 &times; 450 m</td></tr>
+      <tr><td>Base grid</td><td>48 &times; 48 &times; 40 cells</td></tr>
+      <tr><td>Reference velocity</td><td>44.7 m/s (100 mph) at z=10m</td></tr>
+      <tr><td>Wind direction</td><td>+X (East to West)</td></tr>
+      <tr><td>ABL profile</td><td>Log-law (z<sub>0</sub> = 0.1 m)</td></tr>
+      <tr><td>U at roof (248m)</td><td>&asymp; 75.8 m/s (170 mph)</td></tr>
+      <tr><td>Re (tower)</td><td>&asymp; 1.4 &times; 10<sup>8</sup></td></tr>
+      <tr><td>Turbulence model</td><td>k-&omega; SST</td></tr>
+      <tr><td>Air density</td><td>1.225 kg/m&sup3; (sea level)</td></tr>
+      <tr><td>&nu;</td><td>1.5 &times; 10<sup>-5</sup> m&sup2;/s</td></tr>
+    </table>
+    <h2 style="margin-top:16px;">Building Data Source</h2>
+    <table>
+      <tr><td>API</td><td>NYC Open Data Socrata</td></tr>
+      <tr><td>Dataset</td><td>Building Footprints (5zhs-2jue)</td></tr>
+      <tr><td>Heights</td><td>Photogrammetric height_roof (&plusmn;1m)</td></tr>
+      <tr><td>Projection</td><td>Equirectangular (local meters)</td></tr>
+      <tr><td>STL triangles</td><td>~28,400</td></tr>
+    </table>
+  </div>
+
+  <!-- Boundary Conditions -->
+  <div class="card">
+    <h2>Boundary Conditions</h2>
+    <div class="bc-grid">
+      <div class="bc-patch">
+        <div class="name">inlet</div>
+        <div class="type">U: atmBoundaryLayerInletVelocity<br>k: atmBoundaryLayerInletK<br>&omega;: turbulentMixingLengthFrequencyInlet<br>p: zeroGradient</div>
+      </div>
+      <div class="bc-patch">
+        <div class="name">outlet</div>
+        <div class="type">U: inletOutlet<br>k: inletOutlet<br>&omega;: inletOutlet<br>p: fixedValue 0</div>
+      </div>
+      <div class="bc-patch">
+        <div class="name">ground</div>
+        <div class="type">U: noSlip<br>k: kqRWallFunction<br>&omega;: omegaWallFunction<br>p: zeroGradient</div>
+      </div>
+      <div class="bc-patch">
+        <div class="name">top</div>
+        <div class="type">U: slip<br>k: slip<br>&omega;: slip<br>p: slip</div>
+      </div>
+      <div class="bc-patch">
+        <div class="name">citicorp_tower</div>
+        <div class="type">U: noSlip<br>k: kqRWallFunction<br>&omega;: omegaWallFunction<br>p: zeroGradient</div>
+      </div>
+      <div class="bc-patch">
+        <div class="name">citicorp_stilts</div>
+        <div class="type">U: noSlip<br>k: kqRWallFunction<br>&omega;: omegaWallFunction<br>p: zeroGradient</div>
+      </div>
+      <div class="bc-patch">
+        <div class="name">surroundings</div>
+        <div class="type">U: noSlip<br>k: kqRWallFunction<br>&omega;: omegaWallFunction<br>p: zeroGradient</div>
+      </div>
+      <div class="bc-patch">
+        <div class="name">sides</div>
+        <div class="type">U: symmetry<br>k: symmetry<br>&omega;: symmetry<br>p: symmetry</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Solver Settings -->
+  <div class="card">
+    <h2>Numerical Schemes (fvSchemes)</h2>
+    <table>
+      <tr><th>Term</th><th>Scheme</th></tr>
+      <tr><td>Time</td><td>steadyState</td></tr>
+      <tr><td>grad(default)</td><td>Gauss linear</td></tr>
+      <tr><td>grad(U,k,&omega;)</td><td>cellLimited Gauss linear 1</td></tr>
+      <tr><td>div(phi,U)</td><td>bounded Gauss upwind</td></tr>
+      <tr><td>div(phi,k)</td><td>bounded Gauss upwind</td></tr>
+      <tr><td>div(phi,&omega;)</td><td>bounded Gauss upwind</td></tr>
+      <tr><td>laplacian</td><td>Gauss linear limited corrected 0.5</td></tr>
+      <tr><td>snGrad</td><td>limited corrected 0.5</td></tr>
+    </table>
+    <h2 style="margin-top:16px;">Solver Settings (fvSolution)</h2>
+    <table>
+      <tr><td>Algorithm</td><td>SIMPLE (consistent)</td></tr>
+      <tr><td>p solver</td><td>GAMG + GaussSeidel</td></tr>
+      <tr><td>U,k,&omega; solver</td><td>smoothSolver + symGaussSeidel</td></tr>
+      <tr><td>Relaxation U</td><td>0.3</td></tr>
+      <tr><td>Relaxation k, &omega;</td><td>0.3</td></tr>
+      <tr><td>Relaxation p</td><td>0.2</td></tr>
+      <tr><td>Non-orth. correctors</td><td>1</td></tr>
+    </table>
+  </div>
+
+  <!-- Citicorp Building Details -->
+  <div class="card full">
+    <h2>Citicorp Center Structural Details</h2>
+    <table>
+      <tr><th>Parameter</th><th>Value</th><th>Notes</th></tr>
+      <tr><td>Tower height (roof)</td><td>247.8 m (813 ft)</td><td>Crown apex at 278.9 m (915 ft)</td></tr>
+      <tr><td>Floor plan</td><td>49 &times; 49 m (160 &times; 160 ft)</td><td>Square cross-section</td></tr>
+      <tr><td>Stilt height</td><td>35 m (114 ft)</td><td>Open ground level</td></tr>
+      <tr><td>Stilt columns</td><td>4 &times; 6.7m diameter</td><td>Centered on each face midpoint</td></tr>
+      <tr><td>Crown</td><td>45&deg; slope, 248&ndash;278.9 m</td><td>Distinctive sloped top</td></tr>
+      <tr><td>V-bracing</td><td>6 tiers, 8 per tier</td><td>Apex at bottom of each tier (V shape)</td></tr>
+      <tr><td>Location (origin)</td><td>40.7579&deg;N, 73.9690&deg;W</td><td>Lexington Ave &amp; 53rd St, Manhattan</td></tr>
+    </table>
+    <div class="note">Historical context: In 1978, structural engineer William LeMessurier discovered the building's chevron bracing was vulnerable to quartering (diagonal) winds due to bolted (not welded) joints. Emergency repairs were conducted secretly during Hurricane Ella's approach.</div>
+  </div>
+
+</div>
+
+<script>
+// === Residual Chart ===
+const residualData = [[1, 1.0, 1.0, 1.0, 1.0, 1.0, 0.074916936], [2, 0.23017637, 0.28233107, 0.24489002, 0.23730798, 0.43743604, 0.070821375], [3, 0.14007633, 0.21885813, 0.21368156, 0.1748247, 0.25962254, 0.053591457], [4, 0.10686661, 0.16035365, 0.16383159, 0.16740295, 0.1705445, 0.041854197], [5, 0.08597383, 0.11478767, 0.12132899, 0.15782766, 0.12192676, 0.033706322], [6, 0.069367839, 0.077284022, 0.085560948, 0.14821174, 0.09343066, 0.028112804], [7, 0.055231777, 0.047138268, 0.056419132, 0.13922315, 0.075512769, 0.024118105], [8, 0.043193405, 0.025531709, 0.03459821, 0.14004449, 0.063740366, 0.021192677], [9, 0.030603693, 0.021048172, 0.026767491, 0.16458638, 0.055574489, 0.01903309], [10, 0.016902405, 0.029888132, 0.032623665, 0.27880723, 0.049377524, 0.017360801], [15, 0.024591704, 0.018403255, 0.022684845, 0.20502363, 0.031200081, 0.012584362], [20, 0.01032015, 0.015710996, 0.01733166, 0.22391832, 0.021368887, 0.010037858], [25, 0.0035866056, 0.011336199, 0.016058223, 0.37766298, 0.016155291, 0.008697514], [30, 0.0035528282, 0.0086727561, 0.010851056, 0.26554011, 0.012497177, 0.0077402619], [35, 0.0033344246, 0.0071147752, 0.0096357452, 0.17893969, 0.0099762176, 0.0070972346], [40, 0.0023757748, 0.0066097603, 0.0097379619, 0.20080558, 0.0083296172, 0.006717368], [45, 0.0023274755, 0.0062603817, 0.0086500681, 0.165327, 0.0070936395, 0.0063798246], [50, 0.0022161302, 0.0057012333, 0.0079206319, 0.13952629, 0.0061681238, 0.0061329607], [55, 0.0021585555, 0.0056631059, 0.007830969, 0.13461494, 0.0055745696, 0.0060196707], [60, 0.0020362437, 0.0053972448, 0.007749189, 0.1319058, 0.0053727734, 0.0060183652], [65, 0.0019845427, 0.0052299838, 0.0073994155, 0.13274044, 0.0061801695, 0.0065199932], [70, 0.0050781269, 0.010166167, 0.0094752791, 0.14068625, 0.011758408, 0.0081944665], [75, 0.0050674124, 0.01041994, 0.011351303, 0.14472684, 0.029771566, 0.013870928]];
+
+const ctx = document.getElementById('residual-chart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: residualData.map(d => d[0]),
+    datasets: [
+      { label: 'Ux', data: residualData.map(d => d[1]), borderColor: '#ef4444', borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { label: 'Uy', data: residualData.map(d => d[2]), borderColor: '#f97316', borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { label: 'Uz', data: residualData.map(d => d[3]), borderColor: '#eab308', borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { label: 'p', data: residualData.map(d => d[4]), borderColor: '#22c55e', borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { label: 'k', data: residualData.map(d => d[5]), borderColor: '#3b82f6', borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { label: 'omega', data: residualData.map(d => d[6]), borderColor: '#a855f7', borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { title: { display: true, text: 'Iteration', color: '#8899bb' }, ticks: { color: '#667' }, grid: { color: '#1e293b' } },
+      y: { type: 'logarithmic', title: { display: true, text: 'Initial Residual', color: '#8899bb' }, ticks: { color: '#667' }, grid: { color: '#1e293b' }, min: 0.001, max: 1 }
+    },
+    plugins: { legend: { labels: { color: '#c0d0e8', usePointStyle: true, pointStyle: 'line' } } }
+  }
+});
+
+// === 3D STL Viewer ===
+let scene, camera, renderer, controls;
+let meshes = { tower: null, stilts: null, surroundings: null };
+let wireframeMode = false;
+
+function initViewer() {
+  const container = document.getElementById('stl-viewer');
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x070b14);
+
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 5000);
+  camera.position.set(-400, 300, 400);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  container.appendChild(renderer.domElement);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0, 100);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.1;
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x404060, 0.6));
+  const dir1 = new THREE.DirectionalLight(0xffffff, 0.8);
+  dir1.position.set(200, 400, 300);
+  scene.add(dir1);
+  const dir2 = new THREE.DirectionalLight(0x4488cc, 0.3);
+  dir2.position.set(-200, 200, -100);
+  scene.add(dir2);
+
+  // Ground plane
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(2000, 2000),
+    new THREE.MeshStandardMaterial({ color: 0x0a1020, roughness: 0.9 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.5;
+  scene.add(ground);
+
+  // Grid
+  const grid = new THREE.GridHelper(1500, 30, 0x1a2540, 0x101828);
+  scene.add(grid);
+
+  // Wind arrow
+  const arrowDir = new THREE.Vector3(1, 0, 0);
+  const arrowOrigin = new THREE.Vector3(-350, 100, 0);
+  const arrow = new THREE.ArrowHelper(arrowDir, arrowOrigin, 100, 0xff4444, 15, 10);
+  scene.add(arrow);
+
+  // Domain box (wireframe)
+  const domainGeo = new THREE.BoxGeometry(720, 450, 720);
+  const domainMat = new THREE.MeshBasicMaterial({ color: 0x2a3050, wireframe: true, transparent: true, opacity: 0.15 });
+  const domainBox = new THREE.Mesh(domainGeo, domainMat);
+  domainBox.position.set(0, 225, 0);
+  scene.add(domainBox);
+
+  // Load STLs
+  const loader = new THREE.STLLoader();
+  const basePath = 'constant/triSurface/';
+
+  loader.load(basePath + 'citicorp_tower.stl', function(geo) {
+    geo.computeVertexNormals();
+    // STL uses Z-up, Three.js uses Y-up
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshPhongMaterial({ color: 0x3b82f6, shininess: 60, flatShading: true });
+    meshes.tower = new THREE.Mesh(geo, mat);
+    scene.add(meshes.tower);
+  });
+
+  loader.load(basePath + 'citicorp_stilts.stl', function(geo) {
+    geo.computeVertexNormals();
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshPhongMaterial({ color: 0x06b6d4, shininess: 60, flatShading: true });
+    meshes.stilts = new THREE.Mesh(geo, mat);
+    scene.add(meshes.stilts);
+  });
+
+  loader.load(basePath + 'surroundings.stl', function(geo) {
+    geo.computeVertexNormals();
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshPhongMaterial({ color: 0x64748b, shininess: 20, flatShading: true, transparent: true, opacity: 0.85 });
+    meshes.surroundings = new THREE.Mesh(geo, mat);
+    scene.add(meshes.surroundings);
+  });
+
+  animate();
+  window.addEventListener('resize', onResize);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function onResize() {
+  const c = document.getElementById('stl-viewer');
+  camera.aspect = c.clientWidth / c.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(c.clientWidth, c.clientHeight);
+}
+
+function resetCamera() { camera.position.set(-400, 300, 400); controls.target.set(0, 100, 0); }
+function viewTop() { camera.position.set(0, 600, 0); controls.target.set(0, 0, 0); }
+function viewFront() { camera.position.set(-500, 150, 0); controls.target.set(0, 150, 0); }
+function viewSide() { camera.position.set(0, 150, 500); controls.target.set(0, 150, 0); }
+function toggleWireframe() {
+  wireframeMode = !wireframeMode;
+  Object.values(meshes).forEach(m => { if (m) m.material.wireframe = wireframeMode; });
+}
+
+initViewer();
+</script>
+</body>
+</html>

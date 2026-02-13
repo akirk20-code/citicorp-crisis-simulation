@@ -1,0 +1,22 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      surfaceFeaturesDict;
+}
+
+surfaces
+(
+    "citicorp_tower.stl"
+    "citicorp_stilts.stl"
+    "surroundings.stl"
+);
+
+includedAngle   150;
+
+subsetFeatures
+{
+    nonManifoldEdges    yes;
+    openEdges           yes;
+}

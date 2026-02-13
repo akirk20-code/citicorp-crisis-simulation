@@ -1,70 +1,95 @@
 #!/bin/bash
 #------------------------------------------------------------------------------
 # Citicorp Center CFD — Complete run script
-# Steady-state RANS (simpleFoam, k-omega SST) with ABL inlet
+# Steady-state RANS (foamRun incompressibleFluid, k-omega SST) with ABL inlet
+#
+# Hardware target: Intel Ultra 9 185H, 64 GB RAM, WSL2
+#   - Meshing:  8 cores (snappyHexMesh is memory-hungry)
+#   - Solving: 10 cores (steady incompressible solve is CPU-bound; 11 physical cores, keep 1 free)
+#   - Target:  8-10 M cells, ~4-8 h solve time
+#
+# IMPORTANT: OpenFOAM cannot handle spaces in paths.
+#   Copy case to ~/citicorp_cfd before running:
+#     cp -r "<windows path>" ~/citicorp_cfd
+#     cd ~/citicorp_cfd && bash Allrun
 #
 # Prerequisites:
-#   - OpenFOAM v2312+ (ESI) sourced
-#   - Python 3 available
-#   - ~2-3M cells, runs in ~10 min on 20 cores
+#   - OpenFOAM sourced (Foundation or ESI)
+#   - Python 3 + requests (pip install requests)
 #------------------------------------------------------------------------------
 
-cd "${0%/*}" || exit 1    # Run from this directory
+cd "${0%/*}" 2>/dev/null  # Run from this directory (no exit on fail: works with "bash Allrun")
 . ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
 
-NPROCS=20
+MESH_PROCS=8
+SOLVE_PROCS=10
+
+die() { echo "ERROR: $1"; exit 1; }
 
 echo "=========================================="
 echo " Citicorp Center CFD Simulation"
-echo " simpleFoam | k-omega SST | ABL inlet"
+echo " foamRun incompressibleFluid | k-omega SST | ABL inlet"
+echo " Mesh: $MESH_PROCS cores  Solve: $SOLVE_PROCS cores"
 echo "=========================================="
 
-# --- Step 1: Generate STL geometry ---
+# --- Step 1: Generate STL geometry (NYC Open Data API) ---
 echo ""
 echo "Step 1: Generating STL geometry..."
-python3 generate_stl.py
-if [ $? -ne 0 ]; then
-    echo "ERROR: STL generation failed"
-    exit 1
-fi
+python3 generate_stl.py || die "STL generation failed"
 
 # --- Step 2: Extract surface features ---
 echo ""
 echo "Step 2: Extracting surface features..."
-runApplication surfaceFeatureExtract
+if command -v surfaceFeatures >/dev/null 2>&1; then
+    FEATURE_APP=surfaceFeatures
+elif command -v surfaceFeatureExtract >/dev/null 2>&1; then
+    FEATURE_APP=surfaceFeatureExtract
+else
+    die "Neither surfaceFeatures nor surfaceFeatureExtract is available"
+fi
+runApplication "$FEATURE_APP"
+[ -f "log.$FEATURE_APP" ] && grep -q "FOAM FATAL" "log.$FEATURE_APP" && die "$FEATURE_APP failed"
 
 # --- Step 3: Background mesh ---
 echo ""
 echo "Step 3: Creating background mesh (blockMesh)..."
 runApplication blockMesh
+[ -f log.blockMesh ] && grep -q "FOAM FATAL" log.blockMesh && die "blockMesh failed"
 
 # --- Step 4: Decompose for parallel snappyHexMesh ---
 echo ""
-echo "Step 4: Decomposing for parallel mesh generation..."
+echo "Step 4: Decomposing for meshing ($MESH_PROCS cores)..."
+sed -i "s/numberOfSubdomains.*/numberOfSubdomains  $MESH_PROCS;/" system/decomposeParDict
 runApplication decomposePar -copyZero
+[ -f log.decomposePar ] && grep -q "FOAM FATAL" log.decomposePar && die "decomposePar failed"
 
 # --- Step 5: Parallel snappyHexMesh ---
 echo ""
-echo "Step 5: Running snappyHexMesh on $NPROCS cores..."
+echo "Step 5: Running snappyHexMesh on $MESH_PROCS cores..."
 runParallel snappyHexMesh -overwrite
+[ -f log.snappyHexMesh ] && grep -q "FOAM FATAL" log.snappyHexMesh && die "snappyHexMesh failed"
 
 # --- Step 6: Reconstruct mesh ---
 echo ""
 echo "Step 6: Reconstructing mesh..."
-runApplication reconstructParMesh -constant
+runApplication reconstructPar -constant
+[ -f log.reconstructPar ] && grep -q "FOAM FATAL" log.reconstructPar && die "mesh reconstruction failed"
 
 # --- Step 7: Clean parallel decomposition ---
 rm -rf processor*
 
 # --- Step 8: Decompose for solver ---
 echo ""
-echo "Step 8: Decomposing for solver..."
+echo "Step 8: Decomposing for solver ($SOLVE_PROCS cores)..."
+sed -i "s/numberOfSubdomains.*/numberOfSubdomains  $SOLVE_PROCS;/" system/decomposeParDict
 runApplication -s solver decomposePar
+[ -f log.solver.decomposePar ] && grep -q "FOAM FATAL" log.solver.decomposePar && die "solver decomposePar failed"
 
-# --- Step 9: Run simpleFoam ---
+# --- Step 9: Run solver ---
 echo ""
-echo "Step 9: Running simpleFoam on $NPROCS cores..."
-runParallel simpleFoam
+echo "Step 9: Running foamRun -solver incompressibleFluid on $SOLVE_PROCS cores..."
+runParallel foamRun
+[ -f log.foamRun ] && grep -q "FOAM FATAL" log.foamRun && die "foamRun failed"
 
 # --- Step 10: Reconstruct solution ---
 echo ""

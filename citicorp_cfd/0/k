@@ -22,6 +22,7 @@ boundaryField
         Uref            44.7;
         Zref            10;
         z0              uniform 0.1;
+        zGround         uniform 0;
         d               uniform 0;
         value           uniform 52.5;
     }

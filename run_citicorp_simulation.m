@@ -7,17 +7,20 @@
 %  substitution created a building with a 1-in-16-year collapse risk.
 %
 %  Modules:
-%    1. 3D Building Geometry & Structural System
-%    2. Wind Pressure Distribution (Full ASCE 7-22)
-%    3. 3D Chevron Bracing Frame Analysis (Direct Stiffness FEA)
-%    4. Connection Stress Amplification (AISC 360-22 Capacities)
-%    5. Monte Carlo Reliability Analysis
+%    1.  3D Building Geometry & Structural System
+%    2.  Wind Pressure Distribution (Full ASCE 7-22)
+%    3.  3D Chevron Bracing Frame Analysis (Direct Stiffness FEA)
+%    4.  Connection Stress Analysis (AISC 360-22 — FEA-derived forces)
+%    5.  Monte Carlo Reliability Analysis (independent Gumbel calibration)
+%    6.  Validation & Results Summary
+%    10. 1978-Era vs Modern Wind Analysis Comparison
+%    11. Data Provenance & Validation Summary
+%    8-9. CFD Post-Processing (optional — runs only if OpenFOAM results exist)
 %
 %  Simplifying assumptions:
 %    - FEA fixes all DOFs at stilt top (z = 114 ft); stilt/foundation
 %      flexibility is not modeled. Wind loads below stilt top are omitted.
-%    - Quartering brace forces use a LeMessurier (1978) amplification
-%      factor enveloped with direct FEA quartering results.
+%    - Quartering brace forces are FEA-derived (no hardcoded amplification).
 %    - Sections are representative, not as-built shop drawings.
 %
 %  No toolbox dependencies — base MATLAB only.
@@ -46,6 +49,7 @@ params.stories_above_stilts = 50; % 59 total - 9 stilt stories
 params.story_height  = (915 - 114) / 50;  % ft — story height above stilts (~16 ft)
 params.tier_stories  = 8;        % stories per chevron tier
 params.n_tiers       = 6;        % "48 braces, in 6 tiers of 8" (Morgenstern 1995)
+params.transfer_stories = 2;    % 2-story transfer zone above stilts (spreads load to corners)
 
 % --- Structural steel properties ---
 params.E_steel       = 29000;    % ksi — Young's modulus
@@ -126,7 +130,7 @@ fprintf('    Connection analysis complete.\n');
 
 %% ===== MODULE 5: MONTE CARLO RELIABILITY =====
 fprintf('\n--- Module 5: Monte Carlo Reliability Analysis ---\n');
-fig5 = monte_carlo_reliability(params);
+[fig5, mc_results] = monte_carlo_reliability(params, fea_results, wind_results);
 fprintf('    Reliability analysis complete.\n');
 
 %% ===== MODULE 6: VALIDATION VISUALIZATION =====
@@ -134,33 +138,71 @@ fprintf('\n--- Module 6: Validation & Results Summary ---\n');
 fig6 = visualize_validation(params, wind_results, fea_results);
 fprintf('    Validation visualization complete.\n');
 
+%% ===== MODULE 10: 1978 vs MODERN COMPARISON =====
+fprintf('\n--- Module 10: 1978-Era vs Modern Wind Analysis ---\n');
+[fig10, results_1978] = analyze_1978_comparison(params, wind_results, fea_results);
+fprintf('    1978 comparison complete.\n');
+
+%% ===== MODULE 11: DATA PROVENANCE & VALIDATION =====
+fprintf('\n--- Module 11: Data Provenance & Validation Summary ---\n');
+fig11 = visualize_provenance(params, wind_results, fea_results, results_1978);
+fprintf('    Provenance summary complete.\n');
+
+%% ===== MODULES 8-9: CFD POST-PROCESSING (if available) =====
+cfd_dir = fullfile(pwd, 'citicorp_cfd', 'postProcessing');
+if exist(cfd_dir, 'dir')
+    fprintf('\n--- Module 8: CFD Results Processing ---\n');
+    cfd_results = process_cfd_results(params);
+    fprintf('    CFD results processed.\n');
+
+    fprintf('\n--- Module 9: CFD vs Analytical Comparison ---\n');
+    fig_cfd = visualize_cfd_comparison(params, wind_results, cfd_results);
+    fprintf('    CFD comparison complete.\n');
+else
+    fprintf('\n  (Skipping Modules 8-9 — citicorp_cfd/postProcessing/ not found)\n');
+    fprintf('  Run OpenFOAM CFD case first, then re-run this script.\n');
+    cfd_results = [];
+    fig_cfd = [];
+end
+
+%% ===== MODULE 12: STRUCTURAL ELEVATION DRAWINGS =====
+fprintf('\n--- Module 12: Structural Elevation Drawings (0° and 45°) ---\n');
+fig12 = draw_structural_elevation(params);
+fprintf('    Structural elevation drawings complete.\n');
+
 %% ===== SAVE ALL FIGURES =====
 fprintf('\n--- Saving figures ---\n');
 out_dir = fullfile(pwd, 'figures');
 if ~exist(out_dir, 'dir'), mkdir(out_dir); end
 
 fig_names = {'01_building_3d', '02_wind_pressure', '03_fea_chevron',...
-             '04_connections', '05_monte_carlo', '06_validation'};
-figs = [fig1, fig2, fig3, fig4, fig5, fig6];
+             '04_connections', '05_monte_carlo', '06_validation',...
+             '10_1978_comparison', '11_provenance', '12_structural_elevation'};
+figs = [fig1, fig2, fig3, fig4, fig5, fig6, fig10, fig11, fig12];
 
-for i = 1:6
+% Append CFD figure if available
+if ~isempty(fig_cfd)
+    fig_names{end+1} = '09_cfd_comparison';
+    figs(end+1) = fig_cfd;
+end
+
+for i = 1:length(figs)
     fpath = fullfile(out_dir, [fig_names{i} '.png']);
     exportgraphics(figs(i), fpath, 'Resolution', 200, 'BackgroundColor', 'k');
     fprintf('    Saved: %s\n', fpath);
 end
-fprintf('    All 6 figures saved to figures/ folder.\n');
+fprintf('    All %d figures saved to figures/ folder.\n', length(figs));
 
 %% ===== SUMMARY =====
 fprintf('\n=============================================================\n');
-fprintf('   SIMULATION COMPLETE — 6 figures generated & saved\n');
+fprintf('   SIMULATION COMPLETE — %d figures generated & saved\n', length(figs));
 fprintf('=============================================================\n');
-fprintf('\nKey Findings:\n');
-fprintf('  1. Quartering winds increase chevron brace forces by ~40%%\n');
-fprintf('  2. A325 bolted splices had insufficient capacity for combined\n');
-fprintf('     tension + shear under quartering wind demands\n');
-fprintf('  3. Without TMD: ~1-in-16 year return period for failure-level winds\n');
-fprintf('  4. With TMD:    ~1-in-55 year return period for failure-level winds\n');
-fprintf('  5. Post-repair (2" welded cover plates): building meets code intent\n');
+fprintf('\nKey Findings (16-scenario full factorial: 2 methods x 2 connections x 2 dirs x 2 TMD):\n');
+fprintf('  1. 1970s methodology (static superposition) predicts higher quartering risk\n');
+fprintf('  2. Modern ASCE 7-22 shows face winds may govern (quartering amp = 0.52)\n');
+fprintf('  3. 1970s worst case (bolted, quartering, no TMD): validates near T=16 yr\n');
+fprintf('  4. All welded scenarios are safe regardless of methodology\n');
+fprintf('  5. The bolt substitution was the root cause in both perspectives\n');
 fprintf('\nNote: NIST 2021 reassessment suggests the original 1978 analysis\n');
 fprintf('was conservative — face winds may actually govern over quartering.\n');
 fprintf('However, the bolted connections were genuinely under-designed.\n');

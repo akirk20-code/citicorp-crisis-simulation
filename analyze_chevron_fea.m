@@ -9,8 +9,17 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
     sh = params.story_height;    % ~13.6 ft
     E  = params.E_steel * 144;   % ksi -> ksf (for ft units)
     G  = params.G_steel * 144;   % ksi -> ksf
-    n_tiers = params.n_tiers;    % 5 chevron tiers
-    tier_h  = params.tier_stories * sh;  % ~108.5 ft per tier
+    n_tiers = params.n_tiers;    % 6 chevron tiers
+    tier_h  = params.tier_stories * sh;  % tier height in ft
+    H       = params.height;             % 915 ft total height
+
+    % Transfer truss (W-pattern between stilt top and V-bracing zone)
+    if isfield(params, 'transfer_stories') && params.transfer_stories > 0
+        n_transfer = params.transfer_stories;
+    else
+        n_transfer = 0;
+    end
+    brace_base = Hs + n_transfer * sh;  % V-tiers start above transfer truss
 
     % Section properties (in^2 -> ft^2, in^4 -> ft^4)
     A_col   = params.A_column / 144;
@@ -44,16 +53,38 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
                 [W,W], [W/2,W], [0,W];      % North (y=W)
                 [0,W], [0,W/2], [0,0]};     % West  (x=0)
 
-    % Create nodes at tier boundaries (including base at Hs)
-    % V-bracing uses only tier-level nodes — no mid-tier peak nodes needed
+    % Quarter-point positions for transfer truss (5-node faces)
+    face_qtr = cell(4, 2);
+    for f = 1:4
+        face_qtr{f,1} = (face_pts{f,1} + face_pts{f,2}) / 2;  % quarter-left
+        face_qtr{f,2} = (face_pts{f,2} + face_pts{f,3}) / 2;  % quarter-right
+    end
+
+    % Create nodes at tier boundaries (V-bracing zone starts at brace_base)
     tier_nodes = zeros(4, n_tiers+1, 3);  % face, level, position -> node_id
 
     for f = 1:4
         for t = 0:n_tiers
-            z_lev = Hs + t * tier_h;
+            z_lev = brace_base + t * tier_h;
             for p = 1:3
                 xy = face_pts{f, p};
                 tier_nodes(f, t+1, p) = add_unique_node([xy(1), xy(2), z_lev]);
+            end
+        end
+    end
+
+    % --- Transfer zone nodes (5 positions per face at z=Hs and z=brace_base) ---
+    xfer_nodes = [];
+    if n_transfer > 0
+        xfer_nodes = zeros(4, 2, 5);  % face x level(bot/top) x position
+        for f = 1:4
+            for lev = 1:2
+                if lev == 1, z_xf = Hs; else, z_xf = brace_base; end
+                xfer_nodes(f, lev, 1) = add_unique_node([face_pts{f,1}, z_xf]);   % corner_L
+                xfer_nodes(f, lev, 2) = add_unique_node([face_qtr{f,1}, z_xf]);   % quarter_L
+                xfer_nodes(f, lev, 3) = add_unique_node([face_pts{f,2}, z_xf]);   % midpoint
+                xfer_nodes(f, lev, 4) = add_unique_node([face_qtr{f,2}, z_xf]);   % quarter_R
+                xfer_nodes(f, lev, 5) = add_unique_node([face_pts{f,3}, z_xf]);   % corner_R
             end
         end
     end
@@ -100,6 +131,33 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
         end
     end
 
+    % --- Transfer truss W-bracing (stilt top to V-brace base) ---
+    if n_transfer > 0
+        A_xfer = A_brace * 1.5;   % heavier transfer truss members
+        I_xfer = I_brace * 2.0;
+
+        for f = 1:4
+            % W-pattern diagonals (viewed from outside: ↘↗↘↗)
+            add_elem(xfer_nodes(f,2,1), xfer_nodes(f,1,2), A_xfer, I_xfer, 2);  % corner_L(top) → qtr_L(bot)
+            add_elem(xfer_nodes(f,1,2), xfer_nodes(f,2,3), A_xfer, I_xfer, 2);  % qtr_L(bot) → mid(top)
+            add_elem(xfer_nodes(f,2,3), xfer_nodes(f,1,4), A_xfer, I_xfer, 2);  % mid(top) → qtr_R(bot)
+            add_elem(xfer_nodes(f,1,4), xfer_nodes(f,2,5), A_xfer, I_xfer, 2);  % qtr_R(bot) → corner_R(top)
+
+            % Vertical posts at all 5 positions
+            for p = 1:5
+                add_elem(xfer_nodes(f,1,p), xfer_nodes(f,2,p), A_col, I_col, 1);
+            end
+
+            % Horizontal chords at both levels
+            for lev = 1:2
+                for p = 1:4
+                    add_elem(xfer_nodes(f,lev,p), xfer_nodes(f,lev,p+1), A_beam, I_beam, 3);
+                end
+            end
+        end
+        fprintf('    Transfer truss: %d-story W-pattern added\n', n_transfer);
+    end
+
     % --- Horizontal beams at each tier level ---
     for f = 1:4
         for t = 1:n_tiers+1
@@ -131,6 +189,20 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
         add_elem(em, nm, A_beam * 2, I_beam * 4, 3);
         add_elem(nm, wm, A_beam * 2, I_beam * 4, 3);
         add_elem(wm, sm, A_beam * 2, I_beam * 4, 3);
+    end
+
+    % --- Transfer zone diaphragm (at z=Hs, connecting face midpoints) ---
+    if n_transfer > 0
+        xf_sm = xfer_nodes(1, 1, 3);  % South midpoint at z=Hs
+        xf_em = xfer_nodes(2, 1, 3);  % East midpoint
+        xf_nm = xfer_nodes(3, 1, 3);  % North midpoint
+        xf_wm = xfer_nodes(4, 1, 3);  % West midpoint
+        add_elem(xf_sm, xf_nm, A_diaphragm, I_diaphragm, 3);
+        add_elem(xf_em, xf_wm, A_diaphragm, I_diaphragm, 3);
+        add_elem(xf_sm, xf_em, A_beam * 2, I_beam * 4, 3);
+        add_elem(xf_em, xf_nm, A_beam * 2, I_beam * 4, 3);
+        add_elem(xf_nm, xf_wm, A_beam * 2, I_beam * 4, 3);
+        add_elem(xf_wm, xf_sm, A_beam * 2, I_beam * 4, 3);
     end
 
     n_elem = size(elements, 1);
@@ -278,6 +350,73 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
     fprintf('    Max displacement (quart.): %.2f in (%.4f ft)\n',...
             max_u_quar, max(abs(U_quar)));
 
+    %% ===== VALIDATION: STATIC EQUILIBRIUM CHECK =====
+    % The sum of applied forces must equal the sum of support reactions.
+    % Reactions are extracted from K*U at the fixed DOFs.
+
+    % Y-direction check (perpendicular wind loads in +Y)
+    F_app_y = sum(F_perp(2:6:ndof));       % total applied Y-force (kips)
+    R_all   = K * U_perp;                  % full force vector: applied at free, reactions at fixed
+    fixed_y_mask = false(ndof, 1);
+    for fd = fixed_dofs
+        if mod(fd, 6) == 2  % Y-direction DOF (1-indexed: 2,8,14,...)
+            fixed_y_mask(fd) = true;
+        end
+    end
+    R_y_support = sum(R_all(fixed_y_mask));  % total Y-reaction at supports
+
+    % Equilibrium: F_applied + R_reactions = 0  →  error = |F + R| / |F|
+    eq_error_perp = abs(F_app_y + R_y_support) / max(abs(F_app_y), 1e-10);
+
+    fprintf('\n    --- VALIDATION CHECKS ---\n');
+    fprintf('    Equilibrium (perp Y): applied=%.1f kips, reactions=%.1f kips, error=%.2e\n',...
+            F_app_y, -R_y_support, eq_error_perp);
+
+    % Quartering: check both X and Y
+    F_app_x_q = sum(F_quar(1:6:ndof));
+    F_app_y_q = sum(F_quar(2:6:ndof));
+    R_all_q   = K * U_quar;
+    fixed_x_mask = false(ndof, 1);
+    for fd = fixed_dofs
+        if mod(fd, 6) == 1  % X-direction DOF
+            fixed_x_mask(fd) = true;
+        end
+    end
+    R_x_q = sum(R_all_q(fixed_x_mask));
+    R_y_q = sum(R_all_q(fixed_y_mask));
+    eq_error_qx = abs(F_app_x_q + R_x_q) / max(abs(F_app_x_q), 1e-10);
+    eq_error_qy = abs(F_app_y_q + R_y_q) / max(abs(F_app_y_q), 1e-10);
+
+    fprintf('    Equilibrium (quar X): applied=%.1f kips, reactions=%.1f kips, error=%.2e\n',...
+            F_app_x_q, -R_x_q, eq_error_qx);
+    fprintf('    Equilibrium (quar Y): applied=%.1f kips, reactions=%.1f kips, error=%.2e\n',...
+            F_app_y_q, -R_y_q, eq_error_qy);
+
+    if max([eq_error_perp, eq_error_qx, eq_error_qy]) < 1e-6
+        fprintf('    PASS: Static equilibrium satisfied (error < 1e-6)\n');
+    else
+        warning('FEA:Equilibrium', 'Equilibrium error exceeds 1e-6 — check model.');
+    end
+
+    % Simplified cantilever comparison (order-of-magnitude check)
+    % Treat building above stilts as a cantilever: L = H - Hs
+    % With effective EI from column stiffness on two faces (2 corners per face)
+    L_cant = (H - Hs);                      % ft — cantilever height
+    EI_col = E * I_col;                     % ksf * ft^4
+    n_cols_resisting = 4;                   % corners on 2 loaded faces
+    EI_total = n_cols_resisting * EI_col;
+    % Uniformly distributed load: w = V_base / L  (approximate)
+    w_cant = abs(F_app_y) / L_cant;         % kips/ft
+    delta_cant = w_cant * L_cant^4 / (8 * EI_total) * 12;  % inches
+
+    fprintf('    Cantilever estimate: delta = %.1f in (FEA = %.1f in, ratio = %.2f)\n',...
+            delta_cant, max_u_perp, max_u_perp / max(delta_cant, 0.01));
+    fprintf('    (Ratio > 1: FEA is more flexible due to brace/diaphragm participation)\n');
+
+    % Drift ratio
+    drift_ratio = H / (max_u_perp / 12);
+    fprintf('    Drift ratio: H/%.0f (typical limit: H/400 to H/200)\n', drift_ratio);
+
     %% ===== COMPUTE MEMBER FORCES =====
     forces_perp = zeros(n_elem, 1);
     forces_quar = zeros(n_elem, 1);
@@ -326,6 +465,10 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
     fea_results.brace_forces_perp = forces_perp(brace_idx);
     fea_results.brace_forces_quar = forces_quar(brace_idx);
     fea_results.brace_idx = brace_idx;
+    fea_results.eq_error_perp = eq_error_perp;
+    fea_results.eq_error_quar = max(eq_error_qx, eq_error_qy);
+    fea_results.drift_ratio = drift_ratio;
+    fea_results.delta_cantilever = delta_cant;
 
     %% ===== PLOTTING =====
     fig = figure('Name','3D FEA — Chevron Bracing System',...

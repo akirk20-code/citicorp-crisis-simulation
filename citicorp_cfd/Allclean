@@ -4,7 +4,7 @@
 # Removes all generated files, keeping only the case setup
 #------------------------------------------------------------------------------
 
-cd "${0%/*}" || exit 1
+cd "${0%/*}" 2>/dev/null
 . ${WM_PROJECT_DIR:?}/bin/tools/CleanFunctions
 
 cleanCase

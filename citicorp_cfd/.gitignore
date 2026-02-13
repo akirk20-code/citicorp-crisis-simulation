@@ -1,0 +1,23 @@
+# OpenFOAM - Mesh and Geometry
+constant/polyMesh/
+constant/triSurface/*.stl
+!constant/triSurface/.gitkeep
+
+# OpenFOAM - Solution & Logs
+[1-9]*/
+postProcessing/
+processor*/
+log.*
+*.log
+.foam
+*.OpenFOAM
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+env/
+.mypy_cache/
+
+# Meeting prep (personal, not committed)
+MEETING_PREP.md

@@ -17,13 +17,10 @@ boundaryField
 {
     inlet
     {
-        type            atmBoundaryLayerInletOmega;
-        flowDir         (1 0 0);
-        zDir            (0 0 1);
-        Uref            44.7;
-        Zref            10;
-        z0              uniform 0.1;
-        d               uniform 0;
+        // atmBoundaryLayerInletOmega not available in OF13 Foundation
+        // Use mixing-length based omega: omega = k^0.5 / (Cmu^0.25 * L)
+        type            turbulentMixingLengthFrequencyInlet;
+        mixingLength    10;     // urban ABL mixing length scale (m)
         value           uniform 3.2;
     }
 

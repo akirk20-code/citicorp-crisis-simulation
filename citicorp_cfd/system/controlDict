@@ -6,7 +6,10 @@ FoamFile
     object      controlDict;
 }
 
-application     simpleFoam;
+application     foamRun;
+solver          incompressibleFluid;
+
+libs            ("libatmosphericModels.so");
 
 startFrom       startTime;
 startTime       0;
@@ -27,88 +30,7 @@ timePrecision   6;
 
 runTimeModifiable true;
 
+// Function objects disabled for initial solve validation
+// Will add back OF13-compatible versions after solver runs successfully
 functions
-{
-    forces
-    {
-        type            forces;
-        libs            (forces);
-        writeControl    timeStep;
-        writeInterval   100;
-        patches         (citicorp_tower citicorp_stilts);
-        rho             rhoInf;
-        rhoInf          1.225;
-        CofR            (0 0 139);
-    }
-
-    yPlus
-    {
-        type            yPlus;
-        libs            (fieldFunctionObjects);
-        writeControl    writeTime;
-    }
-
-    fieldMinMax
-    {
-        type            fieldMinMax;
-        libs            (fieldFunctionObjects);
-        writeControl    timeStep;
-        writeInterval   100;
-        fields          (U p k omega);
-    }
-
-    residuals
-    {
-        type            solverInfo;
-        libs            (utilityFunctionObjects);
-        writeControl    timeStep;
-        writeInterval   1;
-        fields          (p U k omega);
-    }
-
-    pressureCoeffs
-    {
-        type            pressure;
-        libs            (fieldFunctionObjects);
-        writeControl    writeTime;
-        mode            staticCoeff;
-        pRef            0;
-        UInf            (44.7 0 0);
-        rhoInf          1.225;
-    }
-
-    wallShearStress
-    {
-        type            wallShearStress;
-        libs            (fieldFunctionObjects);
-        writeControl    writeTime;
-        patches         (citicorp_tower citicorp_stilts);
-    }
-
-    towerForceCoeffs
-    {
-        type            forceCoeffs;
-        libs            (forces);
-        writeControl    timeStep;
-        writeInterval   50;
-        patches         (citicorp_tower citicorp_stilts);
-        rho             rhoInf;
-        rhoInf          1.225;
-        magUInf         44.7;
-        lRef            47.85;     // tower width (m)
-        Aref            13338;     // tower frontal area (47.85 * 278.9 m^2)
-        CofR            (0 0 139);
-        liftDir         (0 1 0);
-        dragDir         (1 0 0);
-        pitchAxis       (0 0 1);
-    }
-}
-
-// Convergence control
-residualControl
-{
-    p               1e-4;
-    U               1e-5;
-    k               1e-5;
-    omega           1e-5;
-}
+{}
