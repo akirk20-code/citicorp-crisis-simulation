@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Citicorp Center — 3D Structural System</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; color: #ccc; font-family: 'Segoe UI', Consolas, monospace; overflow: hidden; }
+  canvas { display: block; }
+
+  #info-panel {
+    position: absolute; top: 0; right: 0;
+    width: 320px; height: 100vh;
+    background: rgba(10,10,10,0.92);
+    border-left: 1px solid #333;
+    padding: 16px; overflow-y: auto;
+  }
+  #info-panel h2 { color: #ff8c00; font-size: 15px; margin: 12px 0 6px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  #info-panel h2:first-child { margin-top: 0; }
+  #info-panel p, #info-panel li { font-size: 12px; line-height: 1.5; }
+  #info-panel ul { padding-left: 16px; }
+
+  .legend-item { display: flex; align-items: center; margin: 3px 0; font-size: 12px; }
+  .legend-swatch { width: 24px; height: 4px; margin-right: 8px; border-radius: 2px; }
+
+  #title-bar {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(10,10,10,0.85); padding: 10px 16px; border-radius: 6px;
+    border: 1px solid #444;
+  }
+  #title-bar h1 { font-size: 16px; color: #ff8c00; margin-bottom: 2px; }
+  #title-bar p { font-size: 11px; color: #888; }
+
+  #controls-bar {
+    position: absolute; bottom: 12px; left: 12px;
+    background: rgba(10,10,10,0.85); padding: 8px 14px; border-radius: 6px;
+    border: 1px solid #444; font-size: 11px; color: #888;
+  }
+  #controls-bar span { color: #aaa; }
+
+  .toggle-group { margin: 8px 0; }
+  .toggle-group label { display: block; font-size: 12px; margin: 2px 0; cursor: pointer; color: #aaa; }
+  .toggle-group label:hover { color: #fff; }
+  .toggle-group input { margin-right: 6px; accent-color: #ff8c00; }
+
+  #view-buttons { margin: 8px 0; }
+  #view-buttons button {
+    background: #222; color: #ccc; border: 1px solid #444;
+    padding: 4px 10px; margin: 2px; border-radius: 3px; cursor: pointer; font-size: 11px;
+  }
+  #view-buttons button:hover { background: #444; color: #fff; }
+
+  #dims-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+  #dims-table td { font-size: 11px; padding: 2px 4px; border-bottom: 1px solid #1a1a1a; }
+  #dims-table td:first-child { color: #888; }
+  #dims-table td:last-child { color: #ffcc66; text-align: right; }
+</style>
+</head>
+<body>
+
+<div id="title-bar">
+  <h1>Citicorp Center — 3D Structural System</h1>
+  <p>OR 750: Reliability, Safety, and Risk — George Mason University</p>
+</div>
+
+<div id="controls-bar">
+  <span>Orbit:</span> Left-click drag &nbsp;|&nbsp;
+  <span>Zoom:</span> Scroll &nbsp;|&nbsp;
+  <span>Pan:</span> Right-click drag
+</div>
+
+<div id="info-panel">
+  <h2>Building Dimensions</h2>
+  <table id="dims-table">
+    <tr><td>Total height</td><td>915 ft</td></tr>
+    <tr><td>Plan (square)</td><td>157 × 157 ft</td></tr>
+    <tr><td>Stories</td><td>59 (50 above stilts)</td></tr>
+    <tr><td>Stilt height</td><td>114 ft (9 stories)</td></tr>
+    <tr><td>Stilt section</td><td>24 × 24 ft</td></tr>
+    <tr><td>Cantilever</td><td>72 ft (corners)</td></tr>
+    <tr><td>Transfer zone</td><td>2 stories</td></tr>
+    <tr><td>Chevron tiers</td><td>6 × 8 stories</td></tr>
+    <tr><td>TMD mass</td><td>400 tons (floor 63)</td></tr>
+    <tr><td>Roof peak</td><td>~954 ft</td></tr>
+  </table>
+
+  <h2>Legend</h2>
+  <div class="legend-item"><div class="legend-swatch" style="background:#e69a10; height:6px;"></div>Stilts (mid-face columns)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#995a18;"></div>Building edges</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ff66cc;"></div>Transfer zone (V-spread)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ff8c00; height:6px;"></div>Chevron V-bracing</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#995400;"></div>Tier boundary rings</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#b0b0b0;"></div>Roof structure</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ff2222; border-radius:50%; width:10px; height:10px;"></div>TMD (tuned mass damper)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#44cc44;"></div>0° wind (perpendicular)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ff6666;"></div>45° wind (quartering)</div>
+
+  <h2>Display</h2>
+  <div class="toggle-group">
+    <label><input type="checkbox" id="tog-stilts" checked> Stilts</label>
+    <label><input type="checkbox" id="tog-edges" checked> Building edges</label>
+    <label><input type="checkbox" id="tog-transfer" checked> Transfer zone</label>
+    <label><input type="checkbox" id="tog-chevrons" checked> Chevron bracing</label>
+    <label><input type="checkbox" id="tog-rings" checked> Tier boundary rings</label>
+    <label><input type="checkbox" id="tog-roof" checked> Roof</label>
+    <label><input type="checkbox" id="tog-tmd" checked> TMD marker</label>
+    <label><input type="checkbox" id="tog-wind" checked> Wind arrows</label>
+    <label><input type="checkbox" id="tog-ground" checked> Ground plane</label>
+    <label><input type="checkbox" id="tog-labels" checked> Labels</label>
+  </div>
+
+  <h2>Camera Presets</h2>
+  <div id="view-buttons">
+    <button onclick="setView('perspective')">Perspective</button>
+    <button onclick="setView('front')">Front (S)</button>
+    <button onclick="setView('side')">Side (E)</button>
+    <button onclick="setView('quarter')">45° Quarter</button>
+    <button onclick="setView('top')">Plan View</button>
+    <button onclick="setView('base')">Base Detail</button>
+  </div>
+
+  <h2>Structural Notes</h2>
+  <ul>
+    <li>4 stilts at <b>face midpoints</b>, not corners</li>
+    <li>72 ft cantilevers at each corner</li>
+    <li>Transfer zone spreads stilt load to corners</li>
+    <li>48 chevron braces in 6 tiers of 8</li>
+    <li>Tier rings connect all 4 faces at corners</li>
+    <li>Quartering wind loads both faces simultaneously through corner rings</li>
+    <li>Bolt substitution reduced connection capacity ~50%</li>
+  </ul>
+
+  <h2>The Crisis</h2>
+  <p>In 1978, Diane Hartley's thesis question revealed that the change from welded to bolted connections — combined with quartering winds — created a <b>1-in-16-year collapse risk</b> (without TMD). Emergency repairs were made secretly during Hurricane Ella season.</p>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+// ===== PARAMETERS =====
+const W  = 157;         // width (ft)
+const H  = 915;         // total height (ft)
+const Hs = 114;         // stilt height (ft)
+const Sc = 24;          // stilt cross-section (ft)
+const hw = Sc / 2;
+const sh = (H - Hs) / 50;  // story height above stilts
+const nXfer = 2;
+const bb = Hs + nXfer * sh; // brace_base
+const nTiers = 6;
+const tierH = 8 * sh;       // tier height
+const bt = bb + nTiers * tierH; // brace_top
+const roofPeak = H + W / 4;
+
+// Scale: 1 unit = 1 ft, but we center and scale for viewing
+const S = 1 / H;  // normalize so building is ~1 unit tall
+const cx = W / 2, cy = W / 2;
+
+function p(x, y, z) {
+  // Centered, scaled, Y-up coordinate system
+  return new THREE.Vector3((x - cx) * S, z * S, (y - cy) * S);
+}
+
+// ===== SCENE SETUP =====
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0a);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
+camera.position.set(-0.8, 0.6, 1.2);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+document.body.prepend(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.left = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+document.body.prepend(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.5, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.update();
+
+// ===== HELPERS =====
+const groups = {};
+
+function makeGroup(name) {
+  const g = new THREE.Group();
+  g.name = name;
+  scene.add(g);
+  groups[name] = g;
+  return g;
+}
+
+function addLine(group, pts, color, linewidth) {
+  const geom = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color, linewidth: linewidth || 1 });
+  group.add(new THREE.Line(geom, mat));
+}
+
+function addLineLoop(group, pts, color, linewidth) {
+  const geom = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color, linewidth: linewidth || 1 });
+  group.add(new THREE.LineLoop(geom, mat));
+}
+
+function addLabel(group, text, pos, color, size) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  div.style.color = color || '#ffffff';
+  div.style.fontSize = (size || 11) + 'px';
+  div.style.fontFamily = 'Consolas, monospace';
+  div.style.fontWeight = 'bold';
+  div.style.textShadow = '0 0 4px #000, 0 0 8px #000';
+  const label = new CSS2DObject(div);
+  label.position.copy(pos);
+  group.add(label);
+}
+
+function addArrow(group, from, dir, length, color) {
+  const arrow = new THREE.ArrowHelper(
+    dir.normalize(), from, length * S,
+    new THREE.Color(color), length * S * 0.2, length * S * 0.08
+  );
+  group.add(arrow);
+}
+
+// ===== GROUND =====
+const gGround = makeGroup('ground');
+const groundGeo = new THREE.PlaneGeometry(W * 1.6 * S, W * 1.6 * S);
+const groundMat = new THREE.MeshBasicMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+groundMesh.rotation.x = -Math.PI / 2;
+groundMesh.position.y = 0;
+gGround.add(groundMesh);
+// Ground grid
+const gridHelper = new THREE.GridHelper(W * 1.4 * S, 14, 0x333333, 0x1a1a1a);
+gGround.add(gridHelper);
+
+// ===== STILTS =====
+const gStilts = makeGroup('stilts');
+const stiltColor = 0xe69a10;
+const stiltPositions = [
+  [W/2, 0],    // South
+  [W,   W/2],  // East
+  [W/2, W],    // North
+  [0,   W/2],  // West
+];
+
+for (const [sx, sy] of stiltPositions) {
+  const corners = [
+    [sx-hw, sy-hw], [sx+hw, sy-hw],
+    [sx+hw, sy+hw], [sx-hw, sy+hw]
+  ];
+  // Bottom rectangle
+  addLineLoop(gStilts, corners.map(c => p(c[0], c[1], 0)), stiltColor, 2);
+  // Top rectangle
+  addLineLoop(gStilts, corners.map(c => p(c[0], c[1], Hs)), stiltColor, 2);
+  // Verticals
+  for (const c of corners) {
+    addLine(gStilts, [p(c[0], c[1], 0), p(c[0], c[1], Hs)], stiltColor, 2);
+  }
+}
+
+// ===== BUILDING EDGES =====
+const gEdges = makeGroup('edges');
+const edgeColor = 0x995a18;
+const corners2d = [[0,0], [W,0], [W,W], [0,W]];
+
+// Corner verticals
+for (const c of corners2d) {
+  addLine(gEdges, [p(c[0], c[1], Hs), p(c[0], c[1], H)], edgeColor, 1);
+}
+// Horizontal rings at stilt top and roof
+for (const z of [Hs, H]) {
+  addLineLoop(gEdges, corners2d.map(c => p(c[0], c[1], z)), edgeColor, 1);
+}
+
+// ===== TRANSFER ZONE =====
+const gTransfer = makeGroup('transfer');
+const xferColor = 0xff66cc;
+
+// Horizontal ring at brace_base
+addLineLoop(gTransfer, corners2d.map(c => p(c[0], c[1], bb)), edgeColor, 1);
+
+// Transfer truss: /\/\/\/\/\ (10 diagonals = 5 V-peaks per face)
+// Outer ~46°, transitions ~76°, inner/center legs ~64° (center V apex ~52°)
+const botF = [0, 0.250, 0.400, 0.600, 0.750, 1.000];  // 6 bottom node fractions
+const topF = [0.200, 0.350, 0.500, 0.650, 0.800];       // 5 top node fractions (internal)
+const chordColor = 0x993366;
+
+function drawTransferTruss(face) {
+  const [x1,y1] = face[0], [x2,y2] = face[1];
+  const bx = botF.map(f => x1 + (x2-x1)*f);
+  const by = botF.map(f => y1 + (y2-y1)*f);
+  const tx = topF.map(f => x1 + (x2-x1)*f);
+  const ty = topF.map(f => y1 + (y2-y1)*f);
+  // 10 diagonals: /\/\/\/\/\ zigzag
+  for (let k = 1; k <= 10; k++) {
+    if (k % 2 === 1) {  // odd: / (bottom to top)
+      const bi = (k-1)/2, ti = (k-1)/2;
+      addLine(gTransfer, [p(bx[bi], by[bi], Hs), p(tx[ti], ty[ti], bb)], xferColor, 2);
+    } else {  // even: \ (top to bottom)
+      const ti = k/2 - 1, bi = k/2;
+      addLine(gTransfer, [p(tx[ti], ty[ti], bb), p(bx[bi], by[bi], Hs)], xferColor, 2);
+    }
+  }
+  // Bottom chord (5 segments)
+  for (let k = 0; k < 5; k++) {
+    addLine(gTransfer, [p(bx[k], by[k], Hs), p(bx[k+1], by[k+1], Hs)], chordColor, 1);
+  }
+  // Top chord (corners + 5 internal = 7 nodes, 6 segments)
+  const taxAll = [x1, ...tx, x2];
+  const tayAll = [y1, ...ty, y2];
+  for (let k = 0; k < 6; k++) {
+    addLine(gTransfer, [p(taxAll[k], tayAll[k], bb), p(taxAll[k+1], tayAll[k+1], bb)], chordColor, 1);
+  }
+  // Corner verticals
+  addLine(gTransfer, [p(x1, y1, Hs), p(x1, y1, bb)], chordColor, 1);
+  addLine(gTransfer, [p(x2, y2, Hs), p(x2, y2, bb)], chordColor, 1);
+}
+
+// All 4 faces
+drawTransferTruss([[0, 0], [W, 0], 'y']);    // South
+drawTransferTruss([[W, 0], [W, W], 'x']);    // East
+drawTransferTruss([[W, W], [0, W], 'y']);    // North
+drawTransferTruss([[0, W], [0, 0], 'x']);    // West
+
+// ===== CHEVRON V-BRACES =====
+const gChevrons = makeGroup('chevrons');
+const braceColor = 0xff8c00;
+
+// Each face: 1st tier truncated V (legs at W-peak positions 0.350/0.650),
+// remaining tiers normal sharp V with apex at bottom center
+function drawFaceChevrons(x1,y1, x2,y2, fixedAxis) {
+  let z = bb;
+  for (let t = 0; t < nTiers; t++) {
+    const zTop = Math.min(z + tierH, bt);
+    if (t === 0) {
+      // Tier 1: truncated V — legs connect at transfer truss inner W-peaks
+      if (fixedAxis === 'y') {
+        const xmL = x1 + (x2 - x1) * 0.350;
+        const xmR = x1 + (x2 - x1) * 0.650;
+        addLine(gChevrons, [p(x1, y1, zTop), p(xmL, y1, z)], braceColor, 2);
+        addLine(gChevrons, [p(x2, y2, zTop), p(xmR, y2, z)], braceColor, 2);
+        addLine(gChevrons, [p(xmL, y1, z), p(xmR, y1, z)], braceColor, 1.5);
+      } else {
+        const ymL = y1 + (y2 - y1) * 0.350;
+        const ymR = y1 + (y2 - y1) * 0.650;
+        addLine(gChevrons, [p(x1, y1, zTop), p(x1, ymL, z)], braceColor, 2);
+        addLine(gChevrons, [p(x2, y2, zTop), p(x2, ymR, z)], braceColor, 2);
+        addLine(gChevrons, [p(x1, ymL, z), p(x2, ymR, z)], braceColor, 1.5);
+      }
+    } else {
+      // Tiers 2-6: normal sharp V with apex at bottom center
+      if (fixedAxis === 'y') {
+        const xm = (x1 + x2) / 2;
+        addLine(gChevrons, [p(x1, y1, zTop), p(xm, y1, z)], braceColor, 2);
+        addLine(gChevrons, [p(x2, y2, zTop), p(xm, y2, z)], braceColor, 2);
+      } else {
+        const ym = (y1 + y2) / 2;
+        addLine(gChevrons, [p(x1, y1, zTop), p(x1, ym, z)], braceColor, 2);
+        addLine(gChevrons, [p(x2, y2, zTop), p(x2, ym, z)], braceColor, 2);
+      }
+    }
+    z = zTop;
+  }
+}
+
+// South (y=0), North (y=W), West (x=0), East (x=W)
+drawFaceChevrons(0, 0, W, 0, 'y');
+drawFaceChevrons(0, W, W, W, 'y');
+drawFaceChevrons(0, 0, 0, W, 'x');
+drawFaceChevrons(W, 0, W, W, 'x');
+
+// ===== TIER BOUNDARY RINGS =====
+const gRings = makeGroup('rings');
+const ringColor = 0x995400;
+
+let zTier = bb;
+for (let t = 0; t < nTiers; t++) {
+  const tz = Math.min(zTier + tierH, bt);
+  addLineLoop(gRings, corners2d.map(c => p(c[0], c[1], tz)), ringColor, 1);
+  zTier = tz;
+}
+
+// ===== ROOF =====
+const gRoof = makeGroup('roof');
+const roofColor = 0xb0b0b0;
+
+// South triangle
+addLine(gRoof, [p(0, 0, H), p(W/2, W/2, roofPeak)], roofColor, 1);
+addLine(gRoof, [p(W, 0, H), p(W/2, W/2, roofPeak)], roofColor, 1);
+// North triangle
+addLine(gRoof, [p(0, W, H), p(W/2, W/2, roofPeak)], roofColor, 1);
+addLine(gRoof, [p(W, W, H), p(W/2, W/2, roofPeak)], roofColor, 1);
+// Ridge (simplified as peak point)
+// East/West ridge edges
+addLine(gRoof, [p(0, 0, H), p(0, W, H)], roofColor, 1);
+addLine(gRoof, [p(W, 0, H), p(W, W, H)], roofColor, 1);
+
+// ===== TMD MARKER =====
+const gTMD = makeGroup('tmd');
+const tmdZ = Hs + 54 * sh;
+const tmdGeo = new THREE.SphereGeometry(8 * S, 16, 16);
+const tmdMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+const tmdMesh = new THREE.Mesh(tmdGeo, tmdMat);
+tmdMesh.position.copy(p(W/2, W/2, tmdZ));
+gTMD.add(tmdMesh);
+// Glow ring
+const ringGeo = new THREE.RingGeometry(10 * S, 14 * S, 32);
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xff4444, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+ringMesh.position.copy(p(W/2, W/2, tmdZ));
+gTMD.add(ringMesh);
+
+// ===== WIND ARROWS =====
+const gWind = makeGroup('wind');
+const windOffsetY = -80;
+
+// 0-degree wind (perpendicular, from south)
+for (const xPos of [40, W/2, W-40]) {
+  addArrow(gWind, p(xPos, windOffsetY, H/2), new THREE.Vector3(0, 0, 1), 60, 0x44cc44);
+}
+// 45-degree wind (quartering, from SW corner)
+const diagOffset = -60;
+for (const i of [-30, 0, 30]) {
+  addArrow(gWind, p(diagOffset + i, diagOffset - i, H * 0.7),
+    new THREE.Vector3(1, 0, 1).normalize(), 50, 0xff6666);
+}
+
+// ===== LABELS =====
+const gLabels = makeGroup('labels');
+addLabel(gLabels, 'TMD (400 tons)', p(W/2 + 20, W/2 + 20, tmdZ), '#ff4444', 12);
+addLabel(gLabels, '0\u00B0 Wind', p(W/2, windOffsetY - 20, H/2), '#44cc44', 13);
+addLabel(gLabels, '45\u00B0 Wind', p(diagOffset - 30, diagOffset - 10, H * 0.7), '#ff6666', 13);
+addLabel(gLabels, '915 ft', p(W + 25, W/2, H), '#888888', 10);
+addLabel(gLabels, '114 ft (stilts)', p(W + 25, W/2, Hs), '#e69a10', 10);
+addLabel(gLabels, 'Transfer zone', p(W + 25, W/2, (Hs + bb) / 2), '#ff66cc', 9);
+addLabel(gLabels, '157 ft', p(W/2, -15, 0), '#888888', 10);
+
+// Tier labels on south face
+let zLabel = bb;
+for (let t = 1; t <= nTiers; t++) {
+  const zMid = zLabel + tierH / 2;
+  addLabel(gLabels, 'T' + t, p(-18, 0, zMid), '#995400', 9);
+  zLabel += tierH;
+}
+
+// Corner X markers (no corner support)
+for (const c of corners2d) {
+  const markerGeo = new THREE.BufferGeometry().setFromPoints([
+    p(c[0]-6, c[1]-6, Hs-5), p(c[0]+6, c[1]+6, Hs-5),
+  ]);
+  gLabels.add(new THREE.Line(markerGeo, new THREE.LineBasicMaterial({ color: 0xff3333 })));
+  const markerGeo2 = new THREE.BufferGeometry().setFromPoints([
+    p(c[0]+6, c[1]-6, Hs-5), p(c[0]-6, c[1]+6, Hs-5),
+  ]);
+  gLabels.add(new THREE.Line(markerGeo2, new THREE.LineBasicMaterial({ color: 0xff3333 })));
+}
+
+// St. Peter's Church indicator
+addLabel(gLabels, "St. Peter's Church", p(-35, -35, 0), '#666666', 9);
+const churchOutline = [
+  p(-40, -40, 0), p(10, -40, 0), p(10, 10, 0), p(-40, 10, 0)
+];
+addLineLoop(gLabels, churchOutline, 0x444444, 1);
+
+// ===== AMBIENT LIGHT (for TMD sphere) =====
+scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+// ===== TOGGLE CONTROLS =====
+const toggleMap = {
+  'tog-stilts': 'stilts',
+  'tog-edges': 'edges',
+  'tog-transfer': 'transfer',
+  'tog-chevrons': 'chevrons',
+  'tog-rings': 'rings',
+  'tog-roof': 'roof',
+  'tog-tmd': 'tmd',
+  'tog-wind': 'wind',
+  'tog-ground': 'ground',
+  'tog-labels': 'labels',
+};
+
+for (const [id, name] of Object.entries(toggleMap)) {
+  document.getElementById(id).addEventListener('change', (e) => {
+    groups[name].visible = e.target.checked;
+  });
+}
+
+// ===== CAMERA PRESETS =====
+window.setView = function(preset) {
+  const target = new THREE.Vector3(0, 0.5, 0);
+  let pos;
+  switch (preset) {
+    case 'perspective':
+      pos = new THREE.Vector3(-0.8, 0.6, 1.2);
+      break;
+    case 'front':
+      pos = new THREE.Vector3(0, 0.5, 1.8);
+      break;
+    case 'side':
+      pos = new THREE.Vector3(1.8, 0.5, 0);
+      break;
+    case 'quarter':
+      pos = new THREE.Vector3(-1.1, 0.5, 1.1);
+      break;
+    case 'top':
+      pos = new THREE.Vector3(0, 2.0, 0.01);
+      break;
+    case 'base':
+      pos = new THREE.Vector3(-0.4, 0.12, 0.6);
+      target.set(0, 0.1, 0);
+      break;
+  }
+  camera.position.copy(pos);
+  controls.target.copy(target);
+  controls.update();
+};
+
+// ===== RESIZE =====
+function onResize() {
+  const w = window.innerWidth - 320;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  labelRenderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+onResize();
+
+// ===== RENDER LOOP =====
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

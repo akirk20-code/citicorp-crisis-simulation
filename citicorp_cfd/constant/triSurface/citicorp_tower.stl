@@ -1,0 +1,135 @@
+solid citicorp_tower
+  facet normal 0.707107 -0.707107 0.000000
+    outer loop
+      vertex 0.000000 -33.835059 34.750000
+      vertex 33.835059 0.000000 34.750000
+      vertex 33.835059 0.000000 248.000000
+    endloop
+  endfacet
+  facet normal 0.707107 -0.707107 0.000000
+    outer loop
+      vertex 0.000000 -33.835059 34.750000
+      vertex 33.835059 0.000000 248.000000
+      vertex 0.000000 -33.835059 248.000000
+    endloop
+  endfacet
+  facet normal 0.707107 0.707107 0.000000
+    outer loop
+      vertex 33.835059 0.000000 34.750000
+      vertex 0.000000 33.835059 34.750000
+      vertex 0.000000 33.835059 248.000000
+    endloop
+  endfacet
+  facet normal 0.707107 0.707107 -0.000000
+    outer loop
+      vertex 33.835059 0.000000 34.750000
+      vertex 0.000000 33.835059 248.000000
+      vertex 33.835059 0.000000 248.000000
+    endloop
+  endfacet
+  facet normal -0.707107 0.707107 0.000000
+    outer loop
+      vertex 0.000000 33.835059 34.750000
+      vertex -33.835059 0.000000 34.750000
+      vertex -33.835059 0.000000 248.000000
+    endloop
+  endfacet
+  facet normal -0.707107 0.707107 0.000000
+    outer loop
+      vertex 0.000000 33.835059 34.750000
+      vertex -33.835059 0.000000 248.000000
+      vertex 0.000000 33.835059 248.000000
+    endloop
+  endfacet
+  facet normal -0.707107 -0.707107 0.000000
+    outer loop
+      vertex -33.835059 0.000000 34.750000
+      vertex 0.000000 -33.835059 34.750000
+      vertex 0.000000 -33.835059 248.000000
+    endloop
+  endfacet
+  facet normal -0.707107 -0.707107 0.000000
+    outer loop
+      vertex -33.835059 0.000000 34.750000
+      vertex 0.000000 -33.835059 248.000000
+      vertex -33.835059 0.000000 248.000000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 -1.000000
+    outer loop
+      vertex -33.835059 0.000000 34.750000
+      vertex 33.835059 0.000000 34.750000
+      vertex 0.000000 -33.835059 34.750000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 -1.000000
+    outer loop
+      vertex 33.835059 0.000000 34.750000
+      vertex -33.835059 0.000000 34.750000
+      vertex 0.000000 33.835059 34.750000
+    endloop
+  endfacet
+  facet normal 0.000000 -0.415372 0.909652
+    outer loop
+      vertex 0.000000 -33.835059 248.000000
+      vertex 33.835059 0.000000 263.450000
+      vertex 0.000000 33.835059 278.900000
+    endloop
+  endfacet
+  facet normal 0.000000 -0.415372 0.909652
+    outer loop
+      vertex 0.000000 -33.835059 248.000000
+      vertex 0.000000 33.835059 278.900000
+      vertex -33.835059 0.000000 263.450000
+    endloop
+  endfacet
+  facet normal 0.707107 -0.707107 0.000000
+    outer loop
+      vertex 0.000000 -33.835059 248.000000
+      vertex 33.835059 0.000000 248.000000
+      vertex 33.835059 0.000000 263.450000
+    endloop
+  endfacet
+  facet normal 0.707107 0.707107 0.000000
+    outer loop
+      vertex 33.835059 0.000000 248.000000
+      vertex 0.000000 33.835059 248.000000
+      vertex 0.000000 33.835059 278.900000
+    endloop
+  endfacet
+  facet normal 0.707107 0.707107 -0.000000
+    outer loop
+      vertex 33.835059 0.000000 248.000000
+      vertex 0.000000 33.835059 278.900000
+      vertex 33.835059 0.000000 263.450000
+    endloop
+  endfacet
+  facet normal -0.707107 0.707107 0.000000
+    outer loop
+      vertex 0.000000 33.835059 248.000000
+      vertex -33.835059 0.000000 248.000000
+      vertex -33.835059 0.000000 263.450000
+    endloop
+  endfacet
+  facet normal -0.707107 0.707107 0.000000
+    outer loop
+      vertex 0.000000 33.835059 248.000000
+      vertex -33.835059 0.000000 263.450000
+      vertex 0.000000 33.835059 278.900000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 1.000000
+    outer loop
+      vertex -33.835059 0.000000 248.000000
+      vertex 0.000000 -33.835059 248.000000
+      vertex 0.000000 -33.835059 248.000000
+    endloop
+  endfacet
+  facet normal -0.707107 -0.707107 0.000000
+    outer loop
+      vertex -33.835059 0.000000 248.000000
+      vertex 0.000000 -33.835059 248.000000
+      vertex -33.835059 0.000000 263.450000
+    endloop
+  endfacet
+endsolid citicorp_tower

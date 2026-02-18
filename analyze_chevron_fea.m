@@ -53,12 +53,13 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
                 [W,W], [W/2,W], [0,W];      % North (y=W)
                 [0,W], [0,W/2], [0,0]};     % West  (x=0)
 
-    % Quarter-point positions for transfer truss (5-node faces)
-    face_qtr = cell(4, 2);
-    for f = 1:4
-        face_qtr{f,1} = (face_pts{f,1} + face_pts{f,2}) / 2;  % quarter-left
-        face_qtr{f,2} = (face_pts{f,2} + face_pts{f,3}) / 2;  % quarter-right
-    end
+    % Transfer truss: /\/\/\/\/\ (5 V-peaks, 10 diagonals per face)
+    % 6 bottom nodes (fractions: 0, 0.250, 0.400, 0.600, 0.750, 1.000)
+    % 7 top nodes (fractions: 0, 0.200, 0.350, 0.500, 0.650, 0.800, 1.000)
+    bot_frac_xfer = [0, 0.250, 0.400, 0.600, 0.750, 1.000];
+    top_frac_xfer = [0, 0.200, 0.350, 0.500, 0.650, 0.800, 1.000];
+    N_bot_xfer = 6;  % bottom nodes per face
+    N_top_xfer = 7;  % top nodes per face (including corners)
 
     % Create nodes at tier boundaries (V-bracing zone starts at brace_base)
     tier_nodes = zeros(4, n_tiers+1, 3);  % face, level, position -> node_id
@@ -73,19 +74,29 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
         end
     end
 
-    % --- Transfer zone nodes (5 positions per face at z=Hs and z=brace_base) ---
-    xfer_nodes = [];
+    % --- Transfer zone nodes (separate bottom and top positions) ---
+    % Bottom: 6 nodes per face at z=Hs
+    % Top: 7 nodes per face at z=brace_base (including corners)
+    xfer_bot = [];
+    xfer_top = [];
+    stilt_mids = zeros(4, 1);  % stilt center nodes at z=Hs (face midpoints)
     if n_transfer > 0
-        xfer_nodes = zeros(4, 2, 5);  % face x level(bot/top) x position
+        xfer_bot = zeros(4, N_bot_xfer);  % face x bottom_position -> node_id
+        xfer_top = zeros(4, N_top_xfer);  % face x top_position -> node_id
         for f = 1:4
-            for lev = 1:2
-                if lev == 1, z_xf = Hs; else, z_xf = brace_base; end
-                xfer_nodes(f, lev, 1) = add_unique_node([face_pts{f,1}, z_xf]);   % corner_L
-                xfer_nodes(f, lev, 2) = add_unique_node([face_qtr{f,1}, z_xf]);   % quarter_L
-                xfer_nodes(f, lev, 3) = add_unique_node([face_pts{f,2}, z_xf]);   % midpoint
-                xfer_nodes(f, lev, 4) = add_unique_node([face_qtr{f,2}, z_xf]);   % quarter_R
-                xfer_nodes(f, lev, 5) = add_unique_node([face_pts{f,3}, z_xf]);   % corner_R
+            for k = 1:N_bot_xfer
+                frac = bot_frac_xfer(k);
+                xy = face_pts{f,1}*(1-frac) + face_pts{f,3}*frac;
+                xfer_bot(f, k) = add_unique_node([xy, Hs]);
             end
+            for k = 1:N_top_xfer
+                frac = top_frac_xfer(k);
+                xy = face_pts{f,1}*(1-frac) + face_pts{f,3}*frac;
+                xfer_top(f, k) = add_unique_node([xy, brace_base]);
+            end
+            % Stilt center at z=Hs (face midpoint, frac 0.5)
+            xy_mid = face_pts{f, 2};
+            stilt_mids(f) = add_unique_node([xy_mid, Hs]);
         end
     end
 
@@ -116,46 +127,70 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
         end
     end
 
-    % --- Chevron braces (V on each face) ---
-    % Matching the real Citicorp structure: each tier has one V with apex
-    % at the bottom-center (face midpoint) and legs from top corners down.
-    % 2 brace members per tier per face.
+    % --- Chevron braces on each face ---
+    % 1st tier: truncated V (\_/) at transfer truss inner W-peaks (0.350, 0.650)
+    %           2 brace members + 1 horizontal beam
+    % Remaining tiers: normal sharp V with apex at bottom center (0.500)
+    %           2 brace members, no horizontal beam
     for f = 1:4
         for t = 1:n_tiers
             tl = tier_nodes(f, t+1, 1);    % top-left corner
             tr = tier_nodes(f, t+1, 3);    % top-right corner
-            bm = tier_nodes(f, t, 2);      % bottom midpoint (V apex)
-            % V: top corners down to bottom center
-            add_elem(tl, bm, A_brace, I_brace, 2);
-            add_elem(tr, bm, A_brace, I_brace, 2);
+            z_bot_t = brace_base + (t-1) * tier_h;
+            if t == 1
+                % Truncated V: legs at W-peak fractions 0.350 and 0.650
+                xy_L = face_pts{f,1}*(1-0.350) + face_pts{f,3}*0.350;
+                xy_R = face_pts{f,1}*(1-0.650) + face_pts{f,3}*0.650;
+                bm_L = add_unique_node([xy_L, z_bot_t]);
+                bm_R = add_unique_node([xy_R, z_bot_t]);
+                add_elem(tl, bm_L, A_brace, I_brace, 2);
+                add_elem(tr, bm_R, A_brace, I_brace, 2);
+                add_elem(bm_L, bm_R, A_beam, I_beam, 3);
+            else
+                % Normal V: apex at face midpoint (fraction 0.500)
+                xy_mid = face_pts{f,1}*0.5 + face_pts{f,3}*0.5;
+                apex = add_unique_node([xy_mid, z_bot_t]);
+                add_elem(tl, apex, A_brace, I_brace, 2);
+                add_elem(tr, apex, A_brace, I_brace, 2);
+            end
         end
     end
 
-    % --- Transfer truss W-bracing (stilt top to V-brace base) ---
+    % --- Transfer truss: /\/\/\/\/\ (stilt top to V-brace base) ---
+    % 10 diagonals per face (5 V-peaks) with bottom/top nodes at different positions
     if n_transfer > 0
         A_xfer = A_brace * 1.5;   % heavier transfer truss members
         I_xfer = I_brace * 2.0;
 
         for f = 1:4
-            % W-pattern diagonals (viewed from outside: ↘↗↘↗)
-            add_elem(xfer_nodes(f,2,1), xfer_nodes(f,1,2), A_xfer, I_xfer, 2);  % corner_L(top) → qtr_L(bot)
-            add_elem(xfer_nodes(f,1,2), xfer_nodes(f,2,3), A_xfer, I_xfer, 2);  % qtr_L(bot) → mid(top)
-            add_elem(xfer_nodes(f,2,3), xfer_nodes(f,1,4), A_xfer, I_xfer, 2);  % mid(top) → qtr_R(bot)
-            add_elem(xfer_nodes(f,1,4), xfer_nodes(f,2,5), A_xfer, I_xfer, 2);  % qtr_R(bot) → corner_R(top)
+            % 10 diagonals: zigzag /\/\/\/\/\
+            % B=bottom(Hs), T=top(brace_base)
+            add_elem(xfer_bot(f,1), xfer_top(f,2), A_xfer, I_xfer, 2);  % diag 1:  /
+            add_elem(xfer_top(f,2), xfer_bot(f,2), A_xfer, I_xfer, 2);  % diag 2:  \
+            add_elem(xfer_bot(f,2), xfer_top(f,3), A_xfer, I_xfer, 2);  % diag 3:  /
+            add_elem(xfer_top(f,3), xfer_bot(f,3), A_xfer, I_xfer, 2);  % diag 4:  \
+            add_elem(xfer_bot(f,3), xfer_top(f,4), A_xfer, I_xfer, 2);  % diag 5:  /
+            add_elem(xfer_top(f,4), xfer_bot(f,4), A_xfer, I_xfer, 2);  % diag 6:  \
+            add_elem(xfer_bot(f,4), xfer_top(f,5), A_xfer, I_xfer, 2);  % diag 7:  /
+            add_elem(xfer_top(f,5), xfer_bot(f,5), A_xfer, I_xfer, 2);  % diag 8:  \
+            add_elem(xfer_bot(f,5), xfer_top(f,6), A_xfer, I_xfer, 2);  % diag 9:  /
+            add_elem(xfer_top(f,6), xfer_bot(f,6), A_xfer, I_xfer, 2);  % diag 10: \
 
-            % Vertical posts at all 5 positions
-            for p = 1:5
-                add_elem(xfer_nodes(f,1,p), xfer_nodes(f,2,p), A_col, I_col, 1);
+            % Corner verticals (bot corners <-> top corners)
+            add_elem(xfer_bot(f,1), xfer_top(f,1), A_col, I_col, 1);
+            add_elem(xfer_bot(f,6), xfer_top(f,7), A_col, I_col, 1);
+
+            % Bottom chord (6 nodes, 5 segments)
+            for k = 1:(N_bot_xfer-1)
+                add_elem(xfer_bot(f,k), xfer_bot(f,k+1), A_beam, I_beam, 3);
             end
 
-            % Horizontal chords at both levels
-            for lev = 1:2
-                for p = 1:4
-                    add_elem(xfer_nodes(f,lev,p), xfer_nodes(f,lev,p+1), A_beam, I_beam, 3);
-                end
+            % Top chord (7 nodes, 6 segments)
+            for k = 1:(N_top_xfer-1)
+                add_elem(xfer_top(f,k), xfer_top(f,k+1), A_beam, I_beam, 3);
             end
         end
-        fprintf('    Transfer truss: %d-story W-pattern added\n', n_transfer);
+        fprintf('    Transfer truss: %d-story, 10-diagonal pattern added\n', n_transfer);
     end
 
     % --- Horizontal beams at each tier level ---
@@ -193,10 +228,10 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
 
     % --- Transfer zone diaphragm (at z=Hs, connecting face midpoints) ---
     if n_transfer > 0
-        xf_sm = xfer_nodes(1, 1, 3);  % South midpoint at z=Hs
-        xf_em = xfer_nodes(2, 1, 3);  % East midpoint
-        xf_nm = xfer_nodes(3, 1, 3);  % North midpoint
-        xf_wm = xfer_nodes(4, 1, 3);  % West midpoint
+        xf_sm = stilt_mids(1);  % South midpoint at z=Hs (stilt center, frac 0.5)
+        xf_em = stilt_mids(2);  % East midpoint
+        xf_nm = stilt_mids(3);  % North midpoint
+        xf_wm = stilt_mids(4);  % West midpoint
         add_elem(xf_sm, xf_nm, A_diaphragm, I_diaphragm, 3);
         add_elem(xf_em, xf_wm, A_diaphragm, I_diaphragm, 3);
         add_elem(xf_sm, xf_em, A_beam * 2, I_beam * 4, 3);
@@ -243,11 +278,18 @@ function [fig, fea_results] = analyze_chevron_fea(params, wind_results)
     p_q1   = wind_results.p_net_face1_45;
     p_q2   = wind_results.p_net_face2_45;
 
-    trib_h = tier_h / 2;  % tributary height per node
+    brace_top = brace_base + n_tiers * tier_h;
 
     for n = 1:n_nodes
         z_n = nodes(n, 3);
-        if z_n <= Hs + 1, continue; end  % skip base nodes
+        if z_n <= brace_base + 1, continue; end  % skip base/transfer nodes
+
+        % Tributary height: half-tier at top boundary only, full tier elsewhere
+        if abs(z_n - brace_top) < 1
+            trib_h = tier_h / 2;  % top of bracing zone: half tributary above
+        else
+            trib_h = tier_h;      % interior nodes: full tier tributary
+        end
 
         p_0    = interp1(z_wind, p_perp, z_n, 'linear', 'extrap');
         p_45_1 = interp1(z_wind, p_q1, z_n, 'linear', 'extrap');

@@ -1,6 +1,7 @@
 # OpenFOAM - Mesh and Geometry
 constant/polyMesh/
-constant/triSurface/*.stl
+constant/triSurface/*.eMesh
+constant/triSurface/*.obj
 !constant/triSurface/.gitkeep
 
 # OpenFOAM - Solution & Logs

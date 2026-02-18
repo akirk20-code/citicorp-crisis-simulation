@@ -1,0 +1,37 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      forces_tower_only;
+}
+
+towerOnlyForces
+{
+    type            forces;
+    libs            ("libforces.so");
+    patches         (citicorp_tower);
+    rho             rhoInf;
+    rhoInf          1.225;
+    CofR            (0 0 139);
+    writeControl    timeStep;
+    writeInterval   1;
+}
+
+towerOnlyCoeffs
+{
+    type            forceCoeffs;
+    libs            ("libforces.so");
+    patches         (citicorp_tower);
+    rho             rhoInf;
+    rhoInf          1.225;
+    CofR            (0 0 139);
+    liftDir         (0 0 1);
+    dragDir         (1 0 0);
+    pitchAxis       (0 1 0);
+    magUInf         44.7;
+    lRef            59.44;
+    Aref            12957.92;
+    writeControl    timeStep;
+    writeInterval   1;
+}

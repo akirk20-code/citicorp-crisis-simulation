@@ -66,14 +66,13 @@ function fig = analyze_connections(params, fea_results)
 
     F_max_perp = max(F_brace_perp);
     F_max_quar = max(F_brace_quar);
-    target_DC = 0.90;
 
-    n_bolts = max(4, ceil(F_max_perp / (target_DC * Rn_shear_bolt)));
+    n_bolts = params.n_bolts_per_splice;  % 48 (historical: 6 rows x 8 bolts)
     Rn_shear_group = n_bolts * Rn_shear_bolt;
     Rn_tension_group = n_bolts * Rn_tension_bolt;
 
-    fprintf('    Auto-sized bolt group: %d bolts (D/C=%.2f under perp.)\n',...
-            n_bolts, target_DC);
+    fprintf('    Bolt group: %d bolts (D/C=%.2f under perp.)\n',...
+            n_bolts, F_max_perp / max(Rn_shear_group, 0.01));
     fprintf('    Max brace force (perp.):   %.1f kips\n', F_max_perp);
     fprintf('    Max brace force (quart.):  %.1f kips (FEA-derived, amp=%.2f)\n',...
             F_max_quar, amp_derived);

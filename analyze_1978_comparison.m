@@ -29,7 +29,7 @@ function [fig, results_1978] = analyze_1978_comparison(params, wind_results, fea
     alpha22 = 7.0;              % power-law exponent (ASCE 7-22)
 
     % 1972 velocity pressure exposure coefficient
-    Kz_1972 = 2.58 * (max(z, 15) / zg).^(2 / alpha72);
+    Kz_1972 = 2.01 * (max(z, 15) / zg).^(2 / alpha72);
     % Modern ASCE 7-22 coefficient (from Module 2)
     Kz_2022 = 2.01 * (max(z, 15) / zg).^(2 / alpha22);
 
@@ -233,7 +233,7 @@ function [fig, results_1978] = analyze_1978_comparison(params, wind_results, fea
          'Units', 'data');
 
     % Modern: reduced arrows
-    text(0.35, 0.28, 'ASCE 7-22: 0.75 \times cos^2(45\circ) p', 'Color', [0.3 0.7 1],...
+    text(0.35, 0.28, 'ASCE 7-22: 0.75 \times p_{full}', 'Color', [0.3 0.7 1],...
          'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'center',...
          'Units', 'data');
     text(0.35, 0.20, 'Properly reduced for oblique incidence', 'Color', [0.5 0.7 1],...

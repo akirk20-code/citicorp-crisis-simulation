@@ -1,12 +1,18 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  13
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
 FoamFile
 {
-    version     2.0;
     format      ascii;
     class       volScalarField;
+    location    "0";
     object      k;
 }
-
-// k = u_star^2 / sqrt(Cmu) = 3.97^2 / 0.3 = 52.5 m^2/s^2
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 dimensions      [0 2 -2 0 0 0 0];
 
@@ -17,54 +23,51 @@ boundaryField
     inlet
     {
         type            atmBoundaryLayerInletK;
+        z0              uniform 0.1;
         flowDir         (1 0 0);
         zDir            (0 0 1);
+        kappa           0.41;
+        Cmu             0.09;
         Uref            44.7;
         Zref            10;
-        z0              uniform 0.1;
         zGround         uniform 0;
-        d               uniform 0;
         value           uniform 52.5;
     }
-
     outlet
     {
         type            inletOutlet;
         inletValue      uniform 52.5;
         value           uniform 52.5;
     }
-
     ground
     {
         type            kqRWallFunction;
         value           uniform 52.5;
     }
-
     top
     {
         type            slip;
     }
-
     sides
     {
         type            symmetry;
     }
-
     citicorp_tower
     {
         type            kqRWallFunction;
         value           uniform 52.5;
     }
-
     citicorp_stilts
     {
         type            kqRWallFunction;
         value           uniform 52.5;
     }
-
     surroundings
     {
         type            kqRWallFunction;
         value           uniform 52.5;
     }
 }
+
+
+// ************************************************************************* //

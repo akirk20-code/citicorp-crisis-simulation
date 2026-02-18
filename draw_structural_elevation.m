@@ -47,15 +47,54 @@ function fig = draw_structural_elevation(params)
     % Horizontal at stilt top
     plot([0 W], [Hs Hs], '-', 'Color', col_edge, 'LineWidth', 1.5);
 
-    % --- Chevron V-braces (6 tiers) ---
-    z = Hs;
+    % --- Transfer truss (5 V-peaks: /\/\/\/\/\) ---
+    if isfield(params, 'transfer_stories') && params.transfer_stories > 0
+        col_xfer = [1.0 0.4 0.8];  % Magenta
+        bb_elev = Hs + params.transfer_stories * sh;
+        bot_f = [0, 0.250, 0.400, 0.600, 0.750, 1.000];  % 6 bottom nodes
+        top_f = [0.200, 0.350, 0.500, 0.650, 0.800];       % 5 top nodes
+        bx = W * bot_f;
+        tx = W * top_f;
+        % 10 diagonals
+        for k = 1:10
+            if mod(k,2) == 1  % / (bottom to top)
+                bi = (k+1)/2;  ti = (k+1)/2;
+                plot([bx(bi) tx(ti)], [Hs bb_elev], '-', 'Color', col_xfer, 'LineWidth', 2);
+            else  % \ (top to bottom)
+                ti = k/2;  bi = k/2 + 1;
+                plot([tx(ti) bx(bi)], [bb_elev Hs], '-', 'Color', col_xfer, 'LineWidth', 2);
+            end
+        end
+        % Top chord
+        plot([0 W], [bb_elev bb_elev], '-', 'Color', col_xfer*0.5, 'LineWidth', 0.8);
+        % Corner verticals
+        plot([0 0], [Hs bb_elev], '-', 'Color', col_xfer*0.4, 'LineWidth', 0.4);
+        plot([W W], [Hs bb_elev], '-', 'Color', col_xfer*0.4, 'LineWidth', 0.4);
+    end
+
+    % --- Chevron V-braces (6 tiers, starting above transfer zone) ---
+    % 1st tier: truncated V (\_/) at W-peak positions (0.350, 0.650)
+    % Remaining tiers: normal sharp V with apex at bottom center
+    if isfield(params, 'transfer_stories') && params.transfer_stories > 0
+        z = Hs + params.transfer_stories * sh;
+    else
+        z = Hs;
+    end
     for t = 1:n_tiers
         z_top = z + tier_h;
-        xm = W/2;
-        % Left leg: top-left corner down to bottom midpoint
-        plot([0 xm], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
-        % Right leg: top-right corner down to bottom midpoint
-        plot([W xm], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+        if t == 1
+            % Truncated V: legs connect at transfer truss inner W-peaks
+            xm_L = W * 0.350;
+            xm_R = W * 0.650;
+            plot([0 xm_L], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+            plot([W xm_R], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+            plot([xm_L xm_R], [z z], '-', 'Color', col_brace, 'LineWidth', 2);
+        else
+            % Normal V: sharp apex at bottom center
+            xm = W/2;
+            plot([0 xm], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+            plot([W xm], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+        end
         % Horizontal chord at tier top
         plot([0 W], [z_top z_top], '-', 'Color', col_edge*0.8, 'LineWidth', 1);
         z = z_top;
@@ -196,25 +235,76 @@ function fig = draw_structural_elevation(params)
     % Horizontal at stilt top
     plot([left_edge right_edge], [Hs Hs], '-', 'Color', col_edge, 'LineWidth', 1.5);
 
-    % --- Chevron V-braces on BOTH visible faces ---
-    % South face (y=0): corners at (0,0) and (W,0), midpoint at (W/2,0)
-    % West face (x=0): corners at (0,0) and (0,W), midpoint at (0,W/2)
+    % --- Transfer truss (quartering — 5 V-peaks /\/\/\/\/\ on both faces) ---
+    if isfield(params, 'transfer_stories') && params.transfer_stories > 0
+        col_xfer = [1.0 0.4 0.8];
+        bb_q = Hs + params.transfer_stories * sh;
+        bot_f = [0, 0.250, 0.400, 0.600, 0.750, 1.000];
+        top_f = [0.200, 0.350, 0.500, 0.650, 0.800];
+        % South face transfer (projected)
+        bx_s = arrayfun(@(f) proj(W*f, 0), bot_f);
+        tx_s = arrayfun(@(f) proj(W*f, 0), top_f);
+        for k = 1:10
+            if mod(k,2)==1
+                bi=(k+1)/2; ti=(k+1)/2;
+                plot([bx_s(bi) tx_s(ti)],[Hs bb_q],'-','Color',col_xfer,'LineWidth',1.8);
+            else
+                ti=k/2; bi=k/2+1;
+                plot([tx_s(ti) bx_s(bi)],[bb_q Hs],'-','Color',col_xfer,'LineWidth',1.8);
+            end
+        end
+        % West face transfer (projected, slightly dimmer)
+        bx_w = arrayfun(@(f) proj(0, W*f), bot_f);
+        tx_w = arrayfun(@(f) proj(0, W*f), top_f);
+        for k = 1:10
+            if mod(k,2)==1
+                bi=(k+1)/2; ti=(k+1)/2;
+                plot([bx_w(bi) tx_w(ti)],[Hs bb_q],'-','Color',col_xfer*0.8,'LineWidth',1.5);
+            else
+                ti=k/2; bi=k/2+1;
+                plot([tx_w(ti) bx_w(bi)],[bb_q Hs],'-','Color',col_xfer*0.8,'LineWidth',1.5);
+            end
+        end
+        plot([left_edge right_edge],[bb_q bb_q],'-','Color',col_xfer*0.4,'LineWidth',0.8);
+    end
 
-    z = Hs;
+    % --- Chevron V-braces (BOTH visible faces) ---
+    % 1st tier: truncated V at W-peak positions (0.350, 0.650)
+    % Remaining tiers: normal sharp V with apex at bottom center
+
+    if isfield(params, 'transfer_stories') && params.transfer_stories > 0
+        z = Hs + params.transfer_stories * sh;
+    else
+        z = Hs;
+    end
     for t = 1:n_tiers
         z_top = z + tier_h;
 
-        % South face V-brace (projected)
-        % Top corners: (0,0)->c1=0, (W,0)->c2=-W/sqrt(2)
-        % Bottom midpoint: (W/2,0) -> s_south = -W/(2*sqrt(2))
-        plot([c1 s_south], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
-        plot([c2 s_south], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+        if t == 1
+            % South face truncated V (projected)
+            s_south_L = proj(W * 0.350, 0);
+            s_south_R = proj(W * 0.650, 0);
+            plot([c1 s_south_L], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+            plot([c2 s_south_R], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+            plot([s_south_L s_south_R], [z z], '-', 'Color', col_brace, 'LineWidth', 2);
 
-        % West face V-brace (projected)
-        % Top corners: (0,0)->c1=0, (0,W)->c4=+W/sqrt(2)
-        % Bottom midpoint: (0,W/2) -> s_west = +W/(2*sqrt(2))
-        plot([c1 s_west], [z_top z], '-', 'Color', col_brace*0.85, 'LineWidth', 2);
-        plot([c4 s_west], [z_top z], '-', 'Color', col_brace*0.85, 'LineWidth', 2);
+            % West face truncated V (projected)
+            s_west_L = proj(0, W * 0.350);
+            s_west_R = proj(0, W * 0.650);
+            plot([c1 s_west_L], [z_top z], '-', 'Color', col_brace*0.85, 'LineWidth', 2);
+            plot([c4 s_west_R], [z_top z], '-', 'Color', col_brace*0.85, 'LineWidth', 2);
+            plot([s_west_L s_west_R], [z z], '-', 'Color', col_brace*0.85, 'LineWidth', 1.5);
+        else
+            % South face normal V (projected)
+            s_south_mid = proj(W/2, 0);
+            plot([c1 s_south_mid], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+            plot([c2 s_south_mid], [z_top z], '-', 'Color', col_brace, 'LineWidth', 2.5);
+
+            % West face normal V (projected)
+            s_west_mid = proj(0, W/2);
+            plot([c1 s_west_mid], [z_top z], '-', 'Color', col_brace*0.85, 'LineWidth', 2);
+            plot([c4 s_west_mid], [z_top z], '-', 'Color', col_brace*0.85, 'LineWidth', 2);
+        end
 
         % Horizontal chords
         plot([left_edge right_edge], [z_top z_top], '-', 'Color', col_edge*0.6, 'LineWidth', 0.8);

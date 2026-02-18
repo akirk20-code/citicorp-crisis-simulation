@@ -1,13 +1,18 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  13
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
 FoamFile
 {
-    version     2.0;
     format      ascii;
     class       volScalarField;
+    location    "0";
     object      omega;
 }
-
-// omega = u_star / (kappa * sqrt(Cmu) * (z + z0))
-// At z=10m: 3.97 / (0.41 * 0.3 * 10.1) = 3.2 s^-1
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 dimensions      [0 0 -1 0 0 0 0];
 
@@ -17,51 +22,55 @@ boundaryField
 {
     inlet
     {
-        // atmBoundaryLayerInletOmega not available in OF13 Foundation
-        // Use mixing-length based omega: omega = k^0.5 / (Cmu^0.25 * L)
         type            turbulentMixingLengthFrequencyInlet;
-        mixingLength    10;     // urban ABL mixing length scale (m)
+        mixingLength    10;
+        phi             phi;
+        k               k;
         value           uniform 3.2;
     }
-
     outlet
     {
         type            inletOutlet;
         inletValue      uniform 3.2;
         value           uniform 3.2;
     }
-
     ground
     {
+        beta1           0.075;
+        blended         false;
         type            omegaWallFunction;
         value           uniform 3.2;
     }
-
     top
     {
         type            slip;
     }
-
     sides
     {
         type            symmetry;
     }
-
     citicorp_tower
     {
+        beta1           0.075;
+        blended         false;
         type            omegaWallFunction;
         value           uniform 3.2;
     }
-
     citicorp_stilts
     {
+        beta1           0.075;
+        blended         false;
         type            omegaWallFunction;
         value           uniform 3.2;
     }
-
     surroundings
     {
+        beta1           0.075;
+        blended         false;
         type            omegaWallFunction;
         value           uniform 3.2;
     }
 }
+
+
+// ************************************************************************* //

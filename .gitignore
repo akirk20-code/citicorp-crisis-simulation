@@ -19,7 +19,6 @@ building_geometry.json
 # Note: citicorp_cfd/0/ is NOT ignored — it contains initial/boundary conditions
 citicorp_cfd/[1-9]*/
 citicorp_cfd/constant/polyMesh/
-citicorp_cfd/constant/triSurface/*.stl
 citicorp_cfd/constant/triSurface/*.eMesh
 citicorp_cfd/constant/triSurface/*.obj
 citicorp_cfd/constant/extendedFeatureEdgeMesh/
@@ -28,12 +27,26 @@ citicorp_cfd/postProcessing/
 citicorp_cfd/log.*
 citicorp_cfd/*.foam
 
+# OpenFOAM intermediate/generated files
+citicorp_cfd/0/phi
+citicorp_cfd/0/polyMesh/
+citicorp_cfd/badFaces
+citicorp_cfd/problemFaces
+citicorp_cfd/surroundings_*.obj
+citicorp_cfd/surroundings_osm.stl
+citicorp_cfd/citicorp_tower.stl
+citicorp_cfd/citicorp_stilts.stl
+citicorp_cfd/topo_grid.csv
+citicorp_cfd/_stl_data.js
+citicorp_cfd/.claude/
+
 # OS files
 Thumbs.db
 .DS_Store
 desktop.ini
 nul
 _ul
+_ul-*
 
 # IDE
 .vscode/

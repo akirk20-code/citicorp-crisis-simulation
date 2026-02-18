@@ -74,18 +74,19 @@ function fig = visualize_building_3d(params)
     xfer_color  = [1.0 0.4 0.8];  % Magenta
 
     if n_transfer > 0
-        % Transfer V: stilt midpoint at Hs spreads to corners at brace_base
-        % Horizontal at top of transfer zone
+        % Transfer truss: two-W pattern /\/\ /\/\ on each face
+        % Outer diags ~39 deg, V-peak legs ~64 deg (apex ~52 deg)
+        % Horizontal ring at top of transfer zone
         plot3([0 W W 0 0], [0 0 W W 0], brace_base*ones(1,5), ...
               '-', 'Color', edge_color, 'LineWidth', 1.5);
-        % South face: stilt center up to corners
-        draw_transfer_v(0, W, 0, 0, Hs, brace_base, 'y', xfer_color);
-        % North face
-        draw_transfer_v(0, W, W, W, Hs, brace_base, 'y', xfer_color);
-        % West face
-        draw_transfer_v(0, 0, 0, W, Hs, brace_base, 'x', xfer_color);
-        % East face
-        draw_transfer_v(W, W, 0, W, Hs, brace_base, 'x', xfer_color);
+        % South face (y=0)
+        draw_transfer_truss(0, W, 0, 0, Hs, brace_base, 'y', xfer_color);
+        % North face (y=W)
+        draw_transfer_truss(0, W, W, W, Hs, brace_base, 'y', xfer_color);
+        % West face (x=0)
+        draw_transfer_truss(0, 0, 0, W, Hs, brace_base, 'x', xfer_color);
+        % East face (x=W)
+        draw_transfer_truss(W, W, 0, W, Hs, brace_base, 'x', xfer_color);
     end
 
     % ===== CHEVRON BRACING (V pattern on each face) =====
@@ -216,43 +217,114 @@ function fig = visualize_building_3d(params)
     sgtitle('Module 1: Citicorp Center 3D Structural System','Color','w','FontSize',16,'FontWeight','bold');
 end
 
-function draw_transfer_v(x1, x2, y1, y2, z_bot, z_top, fixed_axis, col)
-%DRAW_TRANSFER_V  Draw transfer V in the base zone (stilt center to corners)
-%  Inverted V: apex at bottom-center (stilt midpoint), legs up to corners.
+function draw_transfer_truss(x1, x2, y1, y2, z_bot, z_top, fixed_axis, col)
+%DRAW_TRANSFER_TRUSS  Transfer truss on one face — 10 diagonals (5 V-peaks)
+%  Pattern: /\/\/\/\/\  (center V at stilt, apex ~52 deg)
+%  Outer diags ~46 deg, transitions ~76 deg, inner/center legs ~64 deg
+%  Bottom and top nodes at different positions along face.
+    chord_col = col * 0.5;
+    % Bottom node fractions (6): corners + 4 inner
+    bot_f = [0, 0.250, 0.400, 0.600, 0.750, 1.000];
+    % Top node fractions (5): internal peak positions
+    top_f = [0.200, 0.350, 0.500, 0.650, 0.800];
+
     if strcmp(fixed_axis, 'y')
-        xm = (x1 + x2)/2;
-        % From stilt center (bottom) up to left corner (top)
-        plot3([xm x1], [y1 y1], [z_bot z_top], '-', 'Color', col, 'LineWidth', 2.5);
-        % From stilt center (bottom) up to right corner (top)
-        plot3([xm x2], [y2 y2], [z_bot z_top], '-', 'Color', col, 'LineWidth', 2.5);
+        y_fix = y1;
+        bx = x1 + (x2 - x1) * bot_f;  % 6 bottom x-positions
+        tx = x1 + (x2 - x1) * top_f;  % 5 top x-positions
+        % 10 diagonals: /\/\/\/\/\ zigzag
+        for k = 1:10
+            if mod(k,2) == 1  % odd: / (bottom to top)
+                bi = (k+1)/2;  ti = (k+1)/2;
+                plot3([bx(bi) tx(ti)], [y_fix y_fix], [z_bot z_top], ...
+                      '-', 'Color', col, 'LineWidth', 2.5);
+            else  % even: \ (top to bottom)
+                ti = k/2;  bi = k/2 + 1;
+                plot3([tx(ti) bx(bi)], [y_fix y_fix], [z_top z_bot], ...
+                      '-', 'Color', col, 'LineWidth', 2.5);
+            end
+        end
+        % Bottom chord (5 segments)
+        for k = 1:5
+            plot3([bx(k) bx(k+1)], [y_fix y_fix], [z_bot z_bot], ...
+                  '-', 'Color', chord_col, 'LineWidth', 0.8);
+        end
+        % Top chord (corners + 5 internal = 7 nodes, 6 segments)
+        top_all = [x1, tx, x2];
+        for k = 1:6
+            plot3([top_all(k) top_all(k+1)], [y_fix y_fix], [z_top z_top], ...
+                  '-', 'Color', chord_col, 'LineWidth', 0.8);
+        end
+        % Corner verticals
+        plot3([x1 x1], [y_fix y_fix], [z_bot z_top], '-', 'Color', chord_col, 'LineWidth', 0.5);
+        plot3([x2 x2], [y_fix y_fix], [z_bot z_top], '-', 'Color', chord_col, 'LineWidth', 0.5);
     else
-        ym = (y1 + y2)/2;
-        plot3([x1 x1], [ym y1], [z_bot z_top], '-', 'Color', col, 'LineWidth', 2.5);
-        plot3([x2 x2], [ym y2], [z_bot z_top], '-', 'Color', col, 'LineWidth', 2.5);
+        x_fix = x1;
+        by = y1 + (y2 - y1) * bot_f;
+        ty = y1 + (y2 - y1) * top_f;
+        for k = 1:10
+            if mod(k,2) == 1
+                bi = (k+1)/2;  ti = (k+1)/2;
+                plot3([x_fix x_fix], [by(bi) ty(ti)], [z_bot z_top], ...
+                      '-', 'Color', col, 'LineWidth', 2.5);
+            else
+                ti = k/2;  bi = k/2 + 1;
+                plot3([x_fix x_fix], [ty(ti) by(bi)], [z_top z_bot], ...
+                      '-', 'Color', col, 'LineWidth', 2.5);
+            end
+        end
+        for k = 1:5
+            plot3([x_fix x_fix], [by(k) by(k+1)], [z_bot z_bot], ...
+                  '-', 'Color', chord_col, 'LineWidth', 0.8);
+        end
+        top_all = [y1, ty, y2];
+        for k = 1:6
+            plot3([x_fix x_fix], [top_all(k) top_all(k+1)], [z_top z_top], ...
+                  '-', 'Color', chord_col, 'LineWidth', 0.8);
+        end
+        plot3([x_fix x_fix], [y1 y1], [z_bot z_top], '-', 'Color', chord_col, 'LineWidth', 0.5);
+        plot3([x_fix x_fix], [y2 y2], [z_bot z_top], '-', 'Color', chord_col, 'LineWidth', 0.5);
     end
 end
 
 function draw_chevrons(x1, x2, y1, y2, z_bot, z_top, tier_h, fixed_axis, col)
-%DRAW_CHEVRONS  Draw V-bracing (chevron) on one face
-%  Citicorp chevrons: apex at bottom center of each tier (V shape),
-%  legs going from top corners DOWN to bottom midpoint.
+%DRAW_CHEVRONS  Draw chevron V-bracing on one face
+%  1st tier: truncated V (\_/) with legs at transfer truss W-peak positions
+%            (fractions 0.350 and 0.650 — inner peaks of each W)
+%  Remaining tiers: normal sharp V with apex at bottom center
+    tier = 0;
     z = z_bot;
     while z + tier_h <= z_top + 0.1
+        tier = tier + 1;
         top_z = min(z + tier_h, z_top);
 
-        if strcmp(fixed_axis, 'y')
-            % Face is in x-z plane, y is fixed
-            xm = (x1 + x2)/2;
-            % V: from top corners down to bottom center
-            plot3([x1 xm], [y1 y1], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
-            plot3([x2 xm], [y2 y2], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+        if tier == 1
+            % Truncated V: legs connect at transfer truss inner W-peaks
+            if strcmp(fixed_axis, 'y')
+                xm_L = x1 + (x2 - x1) * 0.350;
+                xm_R = x1 + (x2 - x1) * 0.650;
+                plot3([x1 xm_L], [y1 y1], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+                plot3([x2 xm_R], [y2 y2], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+                plot3([xm_L xm_R], [y1 y1], [z z], '-', 'Color', col, 'LineWidth', 2);
+            else
+                ym_L = y1 + (y2 - y1) * 0.350;
+                ym_R = y1 + (y2 - y1) * 0.650;
+                plot3([x1 x1], [y1 ym_L], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+                plot3([x2 x2], [y2 ym_R], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+                plot3([x1 x1], [ym_L ym_R], [z z], '-', 'Color', col, 'LineWidth', 2);
+            end
         else
-            % Face is in y-z plane, x is fixed
-            ym = (y1 + y2)/2;
-            plot3([x1 x1], [y1 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
-            plot3([x2 x2], [y2 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+            % Normal V: sharp apex at bottom center
+            if strcmp(fixed_axis, 'y')
+                xm = (x1 + x2) / 2;
+                plot3([x1 xm], [y1 y1], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+                plot3([x2 xm], [y2 y2], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+            else
+                ym = (y1 + y2) / 2;
+                plot3([x1 x1], [y1 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+                plot3([x2 x2], [y2 ym], [top_z z], '-', 'Color', col, 'LineWidth', 2.5);
+            end
         end
-        % Note: horizontal chords drawn as full perimeter rings in main function
 
         z = z + tier_h;
     end

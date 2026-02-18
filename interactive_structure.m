@@ -227,28 +227,67 @@ function interactive_structure()
         add_b(ne_br, ne_tr, 'Edge', 'edge');
         add_b(ne_bl, ne_br, 'Edge', 'edge');
 
-        % Transfer zone
+        % Transfer zone — 5 V-peaks: /\/\/\/\/\ (10 diagonals)
+        % Outer ~46 deg, transitions ~76 deg, center V apex ~52 deg
+        % Bottom and top nodes at different positions along face
         if n_xfer > 0
-            nx_l = add_n(0, bb);  nx_r = add_n(W, bb);
-            nc   = add_n(W/2, Hs); % stilt center top
-            add_b(nx_l, nx_r, 'Edge', 'edge');
-            add_b(nc, nx_l, 'Transfer', 'magenta');
-            add_b(nc, nx_r, 'Transfer', 'magenta');
+            bot_f = [0, 0.250, 0.400, 0.600, 0.750, 1.000];  % 6 bottom nodes
+            top_f = [0.200, 0.350, 0.500, 0.650, 0.800];       % 5 internal top nodes
+            b_ids = zeros(1, 6);
+            t_ids = zeros(1, 5);
+            for k = 1:6
+                b_ids(k) = add_n(bot_f(k) * W, Hs);
+            end
+            for k = 1:5
+                t_ids(k) = add_n(top_f(k) * W, bb);
+            end
+            % Corner top nodes (for top chord)
+            tc_L = add_n(0, bb);
+            tc_R = add_n(W, bb);
+            % Top chord: corner_L -> T1 -> T2 -> T3 -> T4 -> T5 -> corner_R
+            add_b(tc_L, t_ids(1), 'Edge', 'edge');
+            for k = 1:4
+                add_b(t_ids(k), t_ids(k+1), 'Edge', 'edge');
+            end
+            add_b(t_ids(5), tc_R, 'Edge', 'edge');
+            % 10 diagonals: /\/\/\/\/\ pattern
+            for k = 1:10
+                if mod(k,2) == 1  % odd: / (bottom to top)
+                    bi = (k+1)/2;  ti = (k+1)/2;
+                    add_b(b_ids(bi), t_ids(ti), 'Transfer', 'magenta');
+                else  % even: \ (top to bottom)
+                    ti = k/2;  bi = k/2 + 1;
+                    add_b(t_ids(ti), b_ids(bi), 'Transfer', 'magenta');
+                end
+            end
+            % Corner verticals
+            add_b(b_ids(1), tc_L, 'Chord', 'chord');
+            add_b(b_ids(6), tc_R, 'Chord', 'chord');
         end
 
         % Chevron V-braces (6 tiers)
-        prev_apex = add_n(W/2, bb);
+        % 1st tier: truncated V at W-peak positions (0.350, 0.650)
+        % Remaining tiers: normal sharp V with apex at bottom center
         for t = 1:pr.n_tiers
             zt = bb + t * tier_h;
             if zt > H + 1, break; end
             ntl = add_n(0, zt);
             ntr = add_n(W, zt);
-            add_b(ntl, prev_apex, 'V-Brace', 'orange');
-            add_b(ntr, prev_apex, 'V-Brace', 'orange');
-            add_b(ntl, ntr, 'Chord', 'chord');
-            if t < pr.n_tiers
-                prev_apex = add_n(W/2, zt);
+            z_bot_t = bb + (t-1) * tier_h;
+            if t == 1
+                % Truncated V: legs at transfer truss inner W-peaks
+                apex_L = add_n(W * 0.350, z_bot_t);
+                apex_R = add_n(W * 0.650, z_bot_t);
+                add_b(ntl, apex_L, 'V-Brace', 'orange');
+                add_b(ntr, apex_R, 'V-Brace', 'orange');
+                add_b(apex_L, apex_R, 'V-Beam', 'orange');
+            else
+                % Normal V: sharp apex at bottom center
+                apex = add_n(W/2, z_bot_t);
+                add_b(ntl, apex, 'V-Brace', 'orange');
+                add_b(ntr, apex, 'V-Brace', 'orange');
             end
+            add_b(ntl, ntr, 'Chord', 'chord');
         end
 
         % Roof

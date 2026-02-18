@@ -43,7 +43,7 @@ function [fig, mc_results] = monte_carlo_reliability(params, fea_results, wind_r
     Cp_ww    = 0.8;
     Cp_lw    = 0.5;
 
-    Kz_1972  = 2.58 * (max(z_wind, 15) / zg).^(2 / alpha72);
+    Kz_1972  = 2.01 * (max(z_wind, 15) / zg).^(2 / alpha72);
     q_1972   = 0.00256 * Kz_1972 * params.V_design^2;  % no Kd
     p_face_72 = q_1972 * G_1972 * (Cp_ww + Cp_lw);     % net face pressure
     V_face_72 = trapz(z_wind, p_face_72 * params.width) / 1000;  % kips
@@ -67,24 +67,43 @@ function [fig, mc_results] = monte_carlo_reliability(params, fea_results, wind_r
     F_perp_1970s = F_perp_modern * scale_72;
     F_quar_1970s = F_perp_1970s * params.quartering_force_factor;  % x1.40
 
-    % TMD dynamic amplification factor
-    damp_amp = sqrt(params.damping_tmd / params.damping_bare);  % ~2.83
+    % TMD dynamic amplification factor (background/resonant separation)
+    % TMD damping only reduces the resonant component; background is
+    % independent of damping. Use gust factor decomposition.
+    if isfield(wind_results, 'B_sq') && isfield(wind_results, 'R_sq')
+        B_sq_w = wind_results.B_sq;
+        R_sq_w = wind_results.R_sq;
+        gQ_w   = wind_results.gQ;
+        gR_w   = wind_results.gR;
+        Iz_w   = wind_results.Iz_bar;
+
+        % Gf numerator with TMD on (as computed in wind module):
+        Gf_num_tmd = 1 + 1.7 * Iz_w * sqrt(gQ_w^2 * B_sq_w + gR_w^2 * R_sq_w);
+
+        % R² scales inversely with damping: R²_bare = R²_tmd * (beta_tmd / beta_bare)
+        R_sq_bare = R_sq_w * (params.damping_tmd / params.damping_bare);
+        Gf_num_bare = 1 + 1.7 * Iz_w * sqrt(gQ_w^2 * B_sq_w + gR_w^2 * R_sq_bare);
+
+        damp_amp = Gf_num_bare / Gf_num_tmd;
+    else
+        % Fallback if wind_results doesn't have gust factor components
+        damp_amp = sqrt(params.damping_tmd / params.damping_bare);
+    end
 
     % Connection capacities
     weld_capacity = phi * params.Fy * params.A_brace;  % CJP groove weld (kips)
 
-    % Bolt group: auto-sized for D/C~0.90 under modern perpendicular demand
+    % Bolt group: historical splice size (6 rows x 8 bolts)
     Ab  = params.bolt_Ab;
     Fnv = params.bolt_Fnv;
     Rn_per_bolt = phi * Fnv * Ab;
-    target_DC   = 0.90;
-    n_bolts     = max(4, ceil(F_perp_modern / (target_DC * Rn_per_bolt)));
+    n_bolts     = params.n_bolts_per_splice;  % 48 (from historical records)
     bolt_capacity = n_bolts * Rn_per_bolt;
 
     fprintf('\n    Connection capacities:\n');
     fprintf('      Weld (CJP): %.1f kips\n', weld_capacity);
     fprintf('      Bolt (%d bolts): %.1f kips (D/C=%.2f under modern perp.)\n',...
-            n_bolts, bolt_capacity, F_perp_modern / bolt_capacity);
+            n_bolts, bolt_capacity, F_perp_modern / max(bolt_capacity, 0.01));
     fprintf('      FEA demands: perp=%.1f, quar=%.1f kips (modern)\n', F_perp_modern, F_quar_modern);
     fprintf('      1970s demands: perp=%.1f, quar=%.1f kips (scaled+amp)\n', F_perp_1970s, F_quar_1970s);
 

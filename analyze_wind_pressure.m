@@ -115,24 +115,23 @@ function [fig, wind_results] = analyze_wind_pressure(params)
     p_net_perp = p_windward + p_leeward;
 
     %% ===== QUARTERING WIND ANALYSIS =====
-    % At 45 degrees, wind pressure acts on two faces simultaneously
-    % Each face sees the component: V*cos(45) = V*0.707
-    % But ASCE 7-22 Section 27.3.6 requires 75% simultaneous on both axes
+    % At 45 degrees, wind pressure acts on two faces simultaneously.
+    % ASCE 7-22 Section 27.3.6 Case 3: apply 75% of full design pressure
+    % on each face (no velocity decomposition — the 0.75 already accounts
+    % for oblique incidence).
     %
     % The key insight: for the Citicorp chevron system, quartering winds
     % create asymmetric loading — half the braces on a face carry increased
     % load while the perpendicular face braces redistribute forces
 
-    V_component = V * cosd(45);  % wind speed component per face
-    qz_45 = 0.00256 * Kz * params.Kzt * params.Kd * params.Ke * V_component^2;
-    qh_45 = qz_45(end);
-
-    % Per ASCE 7-22 Sec. 27.3.6: 75% of design pressures on each face
-    p_face1_45 = 0.75 * qz_45 * Gf * Cp_windward;
-    p_face2_45 = 0.75 * qz_45 * Gf * Cp_windward;
+    % ASCE 7-22 Sec. 27.3.6 Case 3: 75% of full design pressure on each face
+    % No velocity decomposition — the 0.75 factor already accounts for
+    % oblique incidence. Using cos²(45°) would double-reduce.
+    p_face1_45 = 0.75 * qz * Gf * Cp_windward;
+    p_face2_45 = 0.75 * qz * Gf * Cp_windward;
 
     % Net on each windward face for quartering
-    p_leeward_45 = 0.75 * qh_45 * Gf * abs(Cp_leeward) * ones(size(z));
+    p_leeward_45 = 0.75 * qh * Gf * abs(Cp_leeward) * ones(size(z));
     p_net_face1 = p_face1_45 + p_leeward_45;
     p_net_face2 = p_face2_45 + p_leeward_45;
 
@@ -168,6 +167,13 @@ function [fig, wind_results] = analyze_wind_pressure(params)
     wind_results.p_windward = p_windward;
     wind_results.p_leeward = p_leeward;
     wind_results.qz_modern = qz_modern;
+    wind_results.B_sq = B_sq;
+    wind_results.R_sq = R_sq;
+    wind_results.gQ = gQ;
+    wind_results.gR = gR;
+    wind_results.gv = gv;
+    wind_results.Iz_bar = Iz_bar;
+    wind_results.beta_damp = beta_damp;
 
     %% ===== PLOTTING =====
     fig = figure('Name','Wind Pressure Analysis (ASCE 7-22)',...
