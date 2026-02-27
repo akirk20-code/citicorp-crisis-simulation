@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>NYC Building Browser - CityGML vs Socrata Comparison</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; height: 100vh; }
+#sidebar { width: 360px; overflow-y: auto; background: #f8f9fa; border-right: 1px solid #ddd; }
+#sidebar h2 { padding: 12px; background: #1b3a5c; color: #fff; font-size: 14px; position: sticky; top: 0; z-index: 10; }
+#controls { padding: 8px 12px; background: #e9ecef; border-bottom: 1px solid #ddd; font-size: 12px; }
+#controls label { margin-right: 10px; }
+#controls input, #controls select { margin-right: 6px; }
+#stats { padding: 6px 12px; background: #dee2e6; font-size: 11px; border-bottom: 1px solid #ccc; }
+.bldg { padding: 8px 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 11px; }
+.bldg:hover { background: #e3f2fd; }
+.bldg.selected { background: #bbdefb; border-left: 3px solid #1565c0; }
+.bldg .name { font-weight: 600; font-size: 12px; }
+.bldg .meta { color: #666; margin-top: 2px; }
+.bldg .source { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.bldg .source.citygml { background: #c8e6c9; color: #2e7d32; }
+.bldg .source.socrata { background: #fff3e0; color: #e65100; }
+.bldg .source.fallback { background: #ffcdd2; color: #c62828; }
+.links a { color: #1565c0; text-decoration: none; margin-right: 8px; font-size: 10px; }
+.links a:hover { text-decoration: underline; }
+#map { flex: 1; }
+#info { position: absolute; bottom: 10px; left: 370px; background: rgba(255,255,255,0.95); padding: 8px 14px; border-radius: 6px; z-index: 1000; font-size: 11px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); max-width: 400px; }
+</style>
+</head>
+<body>
+<div id="sidebar">
+    <h2>NYC Building Browser</h2>
+    <div id="controls">
+        <div style="margin-bottom:6px">
+            <label>Center:</label>
+            <input id="lat" type="number" step="0.0001" value="40.7579" style="width:90px">
+            <input id="lon" type="number" step="0.0001" value="-73.9690" style="width:90px">
+            <button onclick="loadBuildings()">Load</button>
+        </div>
+        <div>
+            <label>Radius (m):</label>
+            <input id="radius" type="number" value="400" style="width:60px">
+            <label>Show:</label>
+            <select id="filter">
+                <option value="all">All</option>
+                <option value="fallback">Socrata fallback only</option>
+                <option value="citygml">CityGML matched only</option>
+            </select>
+        </div>
+        <div style="margin-top:4px">
+            <label><input type="checkbox" id="showCityGML" checked> CityGML (green)</label>
+            <label><input type="checkbox" id="showSocrata" checked> Socrata fallback (orange)</label>
+        </div>
+        <div style="margin-top:4px">
+            <button onclick="loadPreset('citicorp')">Citicorp Center</button>
+            <button onclick="loadPreset('unhq')">UN Headquarters</button>
+        </div>
+    </div>
+    <div id="stats">Loading...</div>
+    <div id="list"></div>
+</div>
+<div id="map"></div>
+<div id="info">Click a building for details</div>
+
+<script>
+const SOCRATA_URL = 'https://data.cityofnewyork.us/resource/5zhs-2jue.geojson';
+const CITYGML_BINS = new Set(); // Will be populated from CityGML data if available
+
+// Known CityGML BINs for Citicorp domain (from hybrid generator)
+// In production, this would be loaded from the CityGML extraction
+let citygmlBins = new Set();
+
+const map = L.map('map').setView([40.7579, -73.9690], 16);
+
+// Satellite tiles (Esri World Imagery - free, no API key)
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Esri World Imagery',
+    maxZoom: 19
+}).addTo(map);
+
+// Street labels overlay
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19, opacity: 0.7
+}).addTo(map);
+
+let buildingLayers = L.layerGroup().addTo(map);
+let buildings = [];
+let selectedLayer = null;
+
+const PRESETS = {
+    citicorp: { lat: 40.7579, lon: -73.9690, radius: 400, name: 'Citicorp Center' },
+    unhq:     { lat: 40.7489, lon: -73.9680, radius: 300, name: 'UN Headquarters' }
+};
+
+function loadPreset(key) {
+    const p = PRESETS[key];
+    document.getElementById('lat').value = p.lat;
+    document.getElementById('lon').value = p.lon;
+    document.getElementById('radius').value = p.radius;
+    loadBuildings();
+}
+
+async function loadBuildings() {
+    const lat = parseFloat(document.getElementById('lat').value);
+    const lon = parseFloat(document.getElementById('lon').value);
+    const r = parseFloat(document.getElementById('radius').value);
+
+    document.getElementById('stats').textContent = 'Loading...';
+    document.getElementById('list').innerHTML = '';
+    buildingLayers.clearLayers();
+    buildings = [];
+
+    map.setView([lat, lon], r < 200 ? 17 : r < 500 ? 16 : 15);
+
+    // Draw search radius
+    L.circle([lat, lon], { radius: r, color: '#1565c0', fill: false, weight: 1, dashArray: '5,5' }).addTo(buildingLayers);
+    // Center marker
+    L.circleMarker([lat, lon], { radius: 5, color: '#c62828', fillColor: '#c62828', fillOpacity: 1 }).addTo(buildingLayers);
+
+    const dlat = r / 111320;
+    const dlon = r / (111320 * Math.cos(lat * Math.PI / 180));
+    const where = `within_box(the_geom, ${lat+dlat}, ${lon-dlon}, ${lat-dlat}, ${lon+dlon})`;
+
+    try {
+        const resp = await fetch(`${SOCRATA_URL}?$where=${encodeURIComponent(where)}&$limit=5000`);
+        const data = await resp.json();
+        const features = data.features || [];
+
+        // Try to load CityGML BINs from the hybrid generator output
+        // (This would be a separate endpoint in production)
+        await loadCityGMLBins(lat, lon, r);
+
+        let citygmlCount = 0, fallbackCount = 0, totalHeight = 0;
+
+        features.forEach((f, i) => {
+            const props = f.properties || {};
+            const geom = f.geometry || {};
+            const bin = props.bin || '';
+            const height_ft = parseFloat(props.height_roof || 0);
+            const height_m = height_ft * 0.3048;
+            const name = props.name || `Building ${bin || i}`;
+            const year = props.cnstrct_yr || '?';
+            const floors = props.heightroof ? Math.round(height_ft / 13) : '?';
+
+            if (height_m < 3) return; // skip tiny structures
+
+            // Determine source
+            const isCityGML = citygmlBins.has(String(bin));
+            const source = isCityGML ? 'citygml' : 'fallback';
+            if (isCityGML) citygmlCount++; else fallbackCount++;
+            totalHeight += height_m;
+
+            // Get centroid
+            let centroid = [0, 0];
+            if (geom.type === 'MultiPolygon' && geom.coordinates && geom.coordinates[0]) {
+                const ring = geom.coordinates[0][0];
+                centroid = ring.reduce((acc, c) => [acc[0]+c[1]/ring.length, acc[1]+c[0]/ring.length], [0,0]);
+            } else if (geom.type === 'Polygon' && geom.coordinates) {
+                const ring = geom.coordinates[0];
+                centroid = ring.reduce((acc, c) => [acc[0]+c[1]/ring.length, acc[1]+c[0]/ring.length], [0,0]);
+            }
+
+            const color = isCityGML ? '#4caf50' : '#ff9800';
+            const fillColor = isCityGML ? '#81c784' : '#ffb74d';
+
+            // Draw polygon
+            let layer = null;
+            try {
+                layer = L.geoJSON(geom, {
+                    style: { color: color, weight: 1.5, fillColor: fillColor, fillOpacity: 0.5 }
+                }).addTo(buildingLayers);
+            } catch(e) {}
+
+            buildings.push({
+                index: i, bin, name, height_m, height_ft, year, floors,
+                source, centroid, layer, geom, props
+            });
+        });
+
+        // Sort by height descending
+        buildings.sort((a, b) => b.height_m - a.height_m);
+
+        // Update stats
+        const avgH = buildings.length > 0 ? (totalHeight / buildings.length).toFixed(0) : 0;
+        document.getElementById('stats').textContent =
+            `${buildings.length} buildings | ${citygmlCount} CityGML (green) | ${fallbackCount} Socrata fallback (orange) | avg height: ${avgH}m`;
+
+        // Render list
+        renderList();
+
+    } catch(err) {
+        document.getElementById('stats').textContent = `Error: ${err.message}`;
+    }
+}
+
+function renderList() {
+    const filter = document.getElementById('filter').value;
+    const list = document.getElementById('list');
+    list.innerHTML = '';
+
+    buildings.forEach((b, i) => {
+        if (filter === 'fallback' && b.source !== 'fallback') return;
+        if (filter === 'citygml' && b.source !== 'citygml') return;
+
+        const div = document.createElement('div');
+        div.className = 'bldg';
+        div.innerHTML = `
+            <div class="name">${b.name || 'BIN ' + b.bin} <span class="source ${b.source}">${b.source === 'citygml' ? 'CityGML' : 'Socrata'}</span></div>
+            <div class="meta">BIN: ${b.bin} | ${b.height_m.toFixed(0)}m (${b.height_ft.toFixed(0)}ft) | ${b.floors} floors | Built: ${b.year}</div>
+            <div class="links">
+                <a href="https://www.google.com/maps/@${b.centroid[0]},${b.centroid[1]},3a,75y,0h,100t/data=!3m6!1e1!3m4!1s!2e0!7i16384!8i8192" target="_blank">Street View</a>
+                <a href="https://www.google.com/maps/@${b.centroid[0]},${b.centroid[1]},18z/data=!3m1!1e1" target="_blank">Satellite</a>
+                <a href="https://a810-bisweb.nyc.gov/bisweb/PropertyProfileOverviewServlet?bin=${b.bin}" target="_blank">NYC BIS</a>
+            </div>
+        `;
+        div.onclick = () => selectBuilding(b, div);
+        list.appendChild(div);
+    });
+}
+
+function selectBuilding(b, div) {
+    // Deselect previous
+    document.querySelectorAll('.bldg.selected').forEach(el => el.classList.remove('selected'));
+    div.classList.add('selected');
+
+    // Highlight on map
+    if (selectedLayer) buildingLayers.removeLayer(selectedLayer);
+    if (b.geom) {
+        selectedLayer = L.geoJSON(b.geom, {
+            style: { color: '#c62828', weight: 3, fillColor: '#ef5350', fillOpacity: 0.7 }
+        }).addTo(buildingLayers);
+    }
+
+    map.setView(b.centroid, 18);
+
+    document.getElementById('info').innerHTML = `
+        <strong>${b.name || 'BIN ' + b.bin}</strong> |
+        ${b.height_m.toFixed(0)}m | ${b.floors} floors | ${b.year} |
+        <span class="source ${b.source}">${b.source === 'citygml' ? 'CityGML LoD2' : 'Socrata LoD1 (fallback)'}</span><br>
+        ${b.source === 'fallback' ? '<em>This building is a flat-topped extrusion — check Street View to compare with actual roof shape</em>' : '<em>This building has actual roof/wall surfaces from CityGML photogrammetry</em>'}
+    `;
+}
+
+async function loadCityGMLBins(lat, lon, r) {
+    // For now, load from a pre-generated JSON if available
+    // In production this would query the CityGML extraction
+    try {
+        const resp = await fetch('_citygml_bins.json');
+        const bins = await resp.json();
+        citygmlBins = new Set(bins.map(String));
+    } catch(e) {
+        // If no pre-generated file, treat all as Socrata
+        citygmlBins = new Set();
+    }
+}
+
+// Filter change handlers
+document.getElementById('filter').onchange = renderList;
+document.getElementById('showCityGML').onchange = () => { loadBuildings(); };
+document.getElementById('showSocrata').onchange = () => { loadBuildings(); };
+
+// Initial load
+loadBuildings();
+</script>
+</body>
+</html>

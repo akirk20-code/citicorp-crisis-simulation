@@ -40,6 +40,12 @@ citicorp_cfd/topo_grid.csv
 citicorp_cfd/_stl_data.js
 citicorp_cfd/.claude/
 
+# Credentials (NEVER commit)
+**/gee-key.json
+
+# Downloaded data (large, regenerable)
+citicorp_cfd/_citygml/
+
 # OS files
 Thumbs.db
 .DS_Store
