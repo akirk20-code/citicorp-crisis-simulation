@@ -12,8 +12,11 @@ codegen/
 
 # Generated outputs (reproducible from code)
 figures/
-*.pptx
 building_geometry.json
+
+# Screenshots (regenerable from MATLAB/ParaView/Python)
+screenshots/
+!screenshots/reference_photos/
 
 # OpenFOAM runtime output (large, regenerable)
 # Note: citicorp_cfd/0/ is NOT ignored — it contains initial/boundary conditions
@@ -39,6 +42,17 @@ citicorp_cfd/citicorp_stilts.stl
 citicorp_cfd/topo_grid.csv
 citicorp_cfd/_stl_data.js
 citicorp_cfd/.claude/
+
+# STL binary duplicates and alternative geometry (regenerable)
+citicorp_cfd/constant/triSurface/*_bin.stl
+citicorp_cfd/constant/triSurface/*_lod2*.stl
+citicorp_cfd/constant/triSurface/*_nyc3d.stl
+citicorp_cfd/constant/triSurface/zone_*.vtk
+
+# Cached query results (regenerable)
+citicorp_cfd/_socrata_buildings.json
+citicorp_cfd/_citygml_bins.json
+citicorp_cfd/citicorp_footprint.json
 
 # Credentials (NEVER commit)
 **/gee-key.json

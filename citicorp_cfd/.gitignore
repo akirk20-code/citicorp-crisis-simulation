@@ -25,6 +25,3 @@ gee-key.json
 
 # Downloaded data (large, regenerable)
 _citygml/
-
-# Meeting prep (personal, not committed)
-MEETING_PREP.md

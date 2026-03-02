@@ -35,7 +35,7 @@ echo "=========================================="
 # --- Step 1: Generate STL geometry (NYC Open Data API) ---
 echo ""
 echo "Step 1: Generating STL geometry..."
-python3 generate_stl.py || die "STL generation failed"
+python3 generators/generate_stl.py || die "STL generation failed"
 
 # --- Step 2: Extract surface features ---
 echo ""

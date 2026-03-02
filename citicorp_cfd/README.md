@@ -1,46 +1,70 @@
 # Citicorp Center CFD Simulation
 
-A Computational Fluid Dynamics (CFD) project simulating atmospheric boundary layer flow around the Citicorp Center in New York City. This project uses OpenFOAM (ESI version) for the simulation and Python for procedural geometry generation using NYC Open Data.
-
-## Prerequisites
-
-*   **OpenFOAM:** v2406 (ESI) or compatible (requires `foamRun`, `incompressibleFluid` solver).
-*   **Python:** 3.8+
-*   **System:** Linux or WSL2 (Windows Subsystem for Linux).
+Computational Fluid Dynamics simulation of atmospheric boundary layer flow around the Citicorp Center in Midtown Manhattan. Uses OpenFOAM for the simulation and Python for procedural geometry generation from NYC Open Data.
 
 ## Quick Start
 
-1.  **Install Python Dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
 
-2.  **Run Simulation:**
-    The `Allrun` script handles geometry generation, meshing, and solving.
-    ```bash
-    ./Allrun
-    ```
+# Run full simulation (geometry + mesh + solve)
+./Allrun
 
-3.  **Clean Case:**
-    To remove all generated mesh and solution files:
-    ```bash
-    ./Allclean
-    ```
+# Clean all generated files
+./Allclean
+```
 
-## Project Structure
+**Important:** OpenFOAM cannot handle spaces in paths. Copy the case to a space-free location before running:
+```bash
+cp -r "<windows path>" ~/citicorp_cfd
+cd ~/citicorp_cfd && bash Allrun
+```
 
-*   `generate_stl.py`: Fetches building footprints from NYC Open Data and generates `.stl` files.
-*   `system/`: OpenFOAM control dictionaries (`controlDict`, `snappyHexMeshDict`, etc.).
-*   `constant/`: Physical properties and turbulence models.
-*   `0/`: Initial boundary conditions.
+## Prerequisites
+
+- **OpenFOAM:** Foundation v13 (`foamRun -solver incompressibleFluid`) or ESI v2512 (`simpleFoam`)
+- **Python:** 3.8+ with `requests` module
+- **System:** WSL2 Ubuntu (tested on 24.04)
+
+## Directory Structure
+
+```
+Allrun, Allclean          Run/clean scripts
+0/                        Initial and boundary conditions (ABL inlet)
+constant/                 Physical properties and geometry
+  triSurface/             STL files for snappyHexMesh
+system/                   Solver control dictionaries
+
+generators/               STL geometry generation scripts
+  generate_stl.py         Original (hardcoded fallback)
+  generate_stl_nyc3d.py   NYC Open Data API (RECOMMENDED)
+  generate_stl_hybrid.py  CityGML + API (most flexible, supports --year)
+  README.md               Comparison and selection guide
+
+tools/                    Analysis and utility scripts
+paraview/                 ParaView visualization + presentation generators
+un_hq/                    UN Headquarters extraction demo
+dashboards/               Interactive HTML viewers
+docs/                     Technical documentation
+```
 
 ## Simulation Details
 
-*   **Solver:** `foamRun` (incompressible, steady-state).
-*   **Turbulence Model:** k-omega SST.
-*   **Mesh:** `snappyHexMesh` with background `blockMesh`.
-*   **Geometry:** Citicorp tower (detailed) + surrounding buildings (extruded footprints).
+- **Solver:** `foamRun -solver incompressibleFluid` (steady-state RANS)
+- **Turbulence:** k-omega SST
+- **Inlet:** Atmospheric boundary layer (`atmBoundaryLayerInletVelocity`, z0=0.1m, Uref=44.7 m/s)
+- **Mesh:** 3.16M cells (snappyHexMesh, 3 refinement levels)
+- **Hardware:** 8 cores meshing, 10 cores solving (~4 hours on Intel Ultra 9 185H)
+- **Validation:** Cd = 3.24, within 8% of empirical correlations
 
-## License
+## Documentation
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+See [`docs/`](docs/) for detailed technical notes:
+- [ASSUMPTIONS.md](docs/ASSUMPTIONS.md) — Simulation assumptions and limitations
+- [CD_VALIDATION.md](docs/CD_VALIDATION.md) — Drag coefficient hand calculation
+- [VELOCITY_ANALYSIS.md](docs/VELOCITY_ANALYSIS.md) — ABL inlet profile analysis
+- [IMPROVEMENT_ROADMAP.md](docs/IMPROVEMENT_ROADMAP.md) — Future enhancement plan
+- [BUILDING_HEIGHTS.md](docs/BUILDING_HEIGHTS.md) — Surrounding building height analysis
+- [MESH_SIZING_GUIDE.md](docs/MESH_SIZING_GUIDE.md) — Mesh refinement guidance
+- [HOPPER_SETUP.md](docs/HOPPER_SETUP.md) — GMU HPC cluster setup

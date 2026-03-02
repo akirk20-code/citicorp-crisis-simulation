@@ -39,7 +39,7 @@ for key in "${!CASES[@]}"; do
     # Step 1: Generate STLs (run Python script from Windows-accessible location)
     echo "[1/5] Generating STLs with generate_stl_${key}.py..."
     cd "$WIN_CFD"
-    $PYTHON "generate_stl_${key}.py" 2>&1 | tail -20
+    $PYTHON "generators/generate_stl_${key}.py" 2>&1 | tail -20
 
     # Step 2: Copy STLs to case
     echo "[2/5] Copying STLs to $stl_dst..."
